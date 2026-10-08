@@ -1,0 +1,6 @@
+{
+  "name": "Sleep Farm: Virtual Creature Simulation",
+  "description": "An interactive artificial life ecosystem exploring virtual creatures, generative morphology, and sleep-state mappings based on Code as Creative Medium.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
