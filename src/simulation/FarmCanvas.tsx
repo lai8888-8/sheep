@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AmbientParticle, DreamFodder, SheepCreature } from '../types/sheep';
 import { updateFlock } from './flock';
-import { soundEngine } from '../audio/synth';
+import { soundEngine, getSheepBleatConfig } from '../audio/synth';
 
 interface FarmCanvasProps {
   sheep: SheepCreature[];
@@ -22,11 +22,25 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
 
   const [hoveredSheepId, setHoveredSheepId] = useState<number | null>(null);
   const [fodder, setFodder] = useState<DreamFodder | null>(null);
-  const [petEffects, setPetEffects] = useState<Array<{ x: number; y: number; life: number }>>([]);
 
   const starsRef = useRef<Array<{ x: number; y: number; r: number; baseA: number; speed: number }>>([]);
   const firefliesRef = useRef<AmbientParticle[]>([]);
   const grassBladesRef = useRef<Array<{ x: number; h: number; swayOffset: number; color: string }>>([]);
+  const grassCrumbsRef = useRef<Array<{ x: number; y: number; vx: number; vy: number; life: number; color: string; size: number }>>([]);
+  const snoreParticlesRef = useRef<Array<{ x: number; y: number; vx: number; vy: number; life: number; text: string; size: number; phase: number }>>([]);
+  const petHeartsRef = useRef<Array<{
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    size: number;
+    life: number;
+    decay: number;
+    wobblePhase: number;
+    wobbleSpeed: number;
+    color: string;
+    hasShine: boolean;
+  }>>([]);
 
   const lastClickRef = useRef<number>(0);
 
@@ -140,14 +154,60 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
       // Sheep sorted by Y for 2.5D depth
       const sortedSheep = [...sheep].sort((a, b) => a.y - b.y);
       for (const s of sortedSheep) {
+        // Grazing audio & grass particles
+        if (s.isGrazing) {
+          // Play chewing crunch sound during grazing
+          if ((frame + s.id * 11) % 34 === 0) {
+            soundEngine.playChewSound();
+          }
+          // Emit tiny emerald grass crumbs
+          if ((frame + s.id * 7) % 16 === 0) {
+            const mouthWorldX = s.x + (s.size * 0.7) * s.facing;
+            const mouthWorldY = s.y + s.size * 0.42;
+            grassCrumbsRef.current.push({
+              x: mouthWorldX,
+              y: mouthWorldY,
+              vx: (Math.random() - 0.5) * 1.5,
+              vy: Math.random() * 0.7 + 0.3,
+              life: 1.0,
+              color: Math.random() > 0.4 ? '#34d399' : '#10b981',
+              size: 1.6 + Math.random() * 1.6,
+            });
+          }
+        } else if (s.isSleeping) {
+          // Gentle soft snore sound while asleep
+          if ((frame + s.id * 37) % 150 === 0) {
+            soundEngine.playSnoreSound();
+          }
+          // Drift dreamy zZ bubbles
+          if ((frame + s.id * 19) % 48 === 0) {
+            snoreParticlesRef.current.push({
+              x: s.x + (s.size * 0.48) * s.facing + (Math.random() - 0.5) * 8,
+              y: s.y - s.size * 0.35,
+              vx: (Math.random() - 0.5) * 0.25,
+              vy: -(0.55 + Math.random() * 0.25),
+              life: 1.0,
+              text: Math.random() > 0.4 ? 'z' : 'Z',
+              size: 11 + Math.random() * 6,
+              phase: Math.random() * Math.PI * 2,
+            });
+          }
+        }
+
         drawSheep(ctx, s, frame, s.id === hoveredSheepId, showDebugForces);
       }
+
+      // Grass chew crumbs
+      drawGrassCrumbs(ctx);
+
+      // Sleeping zZ snore particles
+      drawSnoreParticles(ctx, frame);
 
       // Fireflies
       drawFireflies(ctx, w, h, frame);
 
-      // Pet heart particles
-      drawPetParticles(ctx);
+      // Pet floating heart bubbles
+      drawPetHeartParticles(ctx, frame);
 
       ctx.restore();
 
@@ -321,7 +381,19 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
     ctx.restore();
   };
 
-  // The Sheep Creature Rendering
+  // ===== NEW SHEEP LOOK (Valais Blacknose / 参考图风格) =================================
+  const SHOW_HORNS = false; // true = draw horns for long sleepers (hornType)
+  const SHOW_AURA = false; // true = keep the yellow glow for good dreams
+  const SHEEP_BLACK = '#1c1917';
+
+  // Darken (amt < 0) or lighten (amt > 0) a #rrggbb colour
+  const shade = (hex: string, amt: number): string => {
+    const cleanHex = hex.replace('#', '');
+    const n = parseInt(cleanHex.length === 3 ? cleanHex.split('').map((c) => c + c).join('') : cleanHex, 16);
+    const f = (v: number) => Math.max(0, Math.min(255, Math.round(v + amt * 255)));
+    return `rgb(${f((n >> 16) & 255)}, ${f((n >> 8) & 255)}, ${f(n & 255)})`;
+  };
+
   const drawSheep = (
     ctx: CanvasRenderingContext2D,
     s: SheepCreature,
@@ -330,16 +402,40 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
     showDebug: boolean
   ) => {
     ctx.save();
-    ctx.translate(s.x, s.y);
+    const isSleeping = s.isSleeping;
+    const isGrazing = s.isGrazing;
+    const sz = s.size;
+
+    // Resting sheep sinks down onto the meadow turf
+    const sleepSink = isSleeping ? sz * 0.16 : 0;
+    ctx.translate(s.x, s.y + sleepSink);
 
     const scaleX = s.facing;
     ctx.scale(scaleX, 1);
 
-    const sz = s.size;
-    const isGrazing = s.isGrazing;
+    const wool = s.woolColor;
+    const outline = shade(wool, -0.3);
+    const OW = Math.max(1.5, sz * 0.05); // outline thickness
 
-    // Optional aura glow for Good / Lucid Dreams
-    if (s.auraGlow) {
+    // Draw a group of ellipses with an outline: all outlines first, then all
+    // fills, so neighbouring blobs do not draw their outline over each other.
+    const woolGroup = (blobs: number[][]) => {
+      ctx.fillStyle = outline;
+      for (const [x, y, rx, ry] of blobs) {
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx + OW, ry + OW, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = wool;
+      for (const [x, y, rx, ry] of blobs) {
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    };
+
+    // Optional aura glow (off by default)
+    if (SHOW_AURA && s.auraGlow) {
       const glowGrad = ctx.createRadialGradient(0, 0, sz * 0.4, 0, 0, sz * 1.35);
       glowGrad.addColorStop(0, 'rgba(253, 224, 71, 0.32)');
       glowGrad.addColorStop(1, 'rgba(253, 224, 71, 0)');
@@ -355,168 +451,165 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
     ctx.ellipse(0, sz * 0.65, sz * 1.05, sz * 0.24, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Four legs with sinusoidal walking cycle
+    // Legs: if sleeping, draw folded hooves tucked under the belly; otherwise standing/walking legs
     const legLength = sz * 0.52;
-    const legWidth = Math.max(3.5, sz * 0.11);
+    const legWidth = Math.max(4, sz * 0.13);
     const legSwing = Math.sin(s.legPhase) * sz * 0.22;
-    const legColor = '#d6d3d1';
-    const hoofColor = '#78716c';
 
-    const legPositions = [
-      { bx: -sz * 0.38, swing: legSwing },
-      { bx: -sz * 0.16, swing: -legSwing },
-      { bx: sz * 0.14, swing: legSwing },
-      { bx: sz * 0.36, swing: -legSwing },
-    ];
-
-    ctx.lineWidth = legWidth;
-    ctx.lineCap = 'round';
-    for (const leg of legPositions) {
-      const startY = sz * 0.35;
-      const endX = leg.bx + (isGrazing ? 0 : leg.swing);
-      const endY = startY + legLength;
-
-      ctx.strokeStyle = legColor;
-      ctx.beginPath();
-      ctx.moveTo(leg.bx, startY);
-      ctx.lineTo(endX, endY);
-      ctx.stroke();
-
-      ctx.strokeStyle = hoofColor;
-      ctx.beginPath();
-      ctx.moveTo(endX, endY - 2);
-      ctx.lineTo(endX, endY + 2);
-      ctx.stroke();
+    if (isSleeping) {
+      // Folded hooves tucked under body
+      ctx.fillStyle = SHEEP_BLACK;
+      const tuckY = sz * 0.36;
+      const hooves = [-sz * 0.36, -sz * 0.14, sz * 0.12, sz * 0.34];
+      for (const hx of hooves) {
+        ctx.beginPath();
+        ctx.ellipse(hx, tuckY, Math.max(3.5, sz * 0.11), Math.max(2.5, sz * 0.07), 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else {
+      const legPositions = [
+        { bx: -sz * 0.38, swing: legSwing },
+        { bx: -sz * 0.16, swing: -legSwing },
+        { bx: sz * 0.14, swing: legSwing },
+        { bx: sz * 0.36, swing: -legSwing },
+      ];
+      ctx.strokeStyle = SHEEP_BLACK;
+      ctx.lineWidth = legWidth;
+      ctx.lineCap = 'round';
+      for (const leg of legPositions) {
+        const startY = sz * 0.35;
+        const endX = leg.bx + (isGrazing ? 0 : leg.swing);
+        ctx.beginPath();
+        ctx.moveTo(leg.bx, startY);
+        ctx.lineTo(endX, startY + legLength);
+        ctx.stroke();
+      }
     }
 
-    // Tail (wagging gently)
-    const tailWag = Math.sin(frame * 0.15) * 3;
-    ctx.fillStyle = s.woolColor;
-    ctx.beginPath();
-    ctx.arc(-sz * 0.68, -sz * 0.05 + tailWag, sz * 0.18, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Central Torso Fluff
-    ctx.fillStyle = s.woolColor;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, sz * 1.15, sz * 0.88, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Procedural Satellite Wool Puffs
-    const puffRadius = sz * 0.32;
-    const puffs = [
-      [-sz * 0.5, -sz * 0.15],
-      [-sz * 0.38, -sz * 0.35],
-      [-sz * 0.15, -sz * 0.42],
-      [sz * 0.1, -sz * 0.42],
-      [sz * 0.32, -sz * 0.32],
-      [sz * 0.45, -sz * 0.1],
-      [sz * 0.35, sz * 0.18],
-      [sz * 0.12, sz * 0.35],
-      [-sz * 0.18, sz * 0.35],
-      [-sz * 0.42, sz * 0.2],
+    // Wool body: tail, torso and satellite puffs (with gentle rhythmic breathing swell)
+    const tailWag = isSleeping ? 0 : Math.sin(frame * 0.15) * 3;
+    const breathe = isSleeping ? Math.sin(frame * 0.05 + s.id) * sz * 0.035 : 0;
+    const puffR = sz * 0.32;
+    const bodyBlobs: number[][] = [
+      [-sz * 0.68, -sz * 0.05 + tailWag, sz * 0.18, sz * 0.18], // tail
+      [0, 0, sz * 1.15 + breathe, sz * 0.88 + breathe], // torso with gentle breathing
+      [-sz * 0.5, -sz * 0.15, puffR, puffR],
+      [-sz * 0.38, -sz * 0.35, puffR, puffR],
+      [-sz * 0.15, -sz * 0.42, puffR, puffR],
+      [sz * 0.1, -sz * 0.42, puffR, puffR],
+      [sz * 0.32, -sz * 0.32, puffR, puffR],
+      [sz * 0.45, -sz * 0.1, puffR, puffR],
+      [sz * 0.35, sz * 0.18, puffR, puffR],
+      [sz * 0.12, sz * 0.35, puffR, puffR],
+      [-sz * 0.18, sz * 0.35, puffR, puffR],
+      [-sz * 0.42, sz * 0.2, puffR, puffR],
     ];
+    woolGroup(bodyBlobs);
 
-    for (const p of puffs) {
-      ctx.beginPath();
-      ctx.arc(p[0], p[1], puffRadius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Head position: tilts down if grazing
-    const headOffsetY = isGrazing ? sz * 0.22 : -sz * 0.08;
-    const headX = sz * 0.58;
-    const headY = headOffsetY;
-
-    // Head base wool puff
-    ctx.beginPath();
-    ctx.ellipse(headX, headY, sz * 0.6, sz * 0.55, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Crown / Bangs wool puffs
+    // Soft shade patches (secondary wool colour, semi-transparent)
+    ctx.globalAlpha = 0.35;
     ctx.fillStyle = s.woolSecondaryColor;
     ctx.beginPath();
-    ctx.arc(headX - sz * 0.14, headY - sz * 0.34, sz * 0.22, 0, Math.PI * 2);
-    ctx.arc(headX + sz * 0.06, headY - sz * 0.38, sz * 0.22, 0, Math.PI * 2);
-    ctx.arc(headX + sz * 0.24, headY - sz * 0.3, sz * 0.18, 0, Math.PI * 2);
+    ctx.ellipse(-sz * 0.1, sz * 0.5, sz * 0.7, sz * 0.2, 0, 0, Math.PI * 2);
     ctx.fill();
-
-    // Soft Skin Face
-    ctx.fillStyle = '#ffedd5';
     ctx.beginPath();
-    ctx.ellipse(headX + sz * 0.14, headY + sz * 0.04, sz * 0.38, sz * 0.34, 0, 0, Math.PI * 2);
+    ctx.ellipse(-sz * 0.2, -sz * 0.45, sz * 0.45, sz * 0.16, -0.15, 0, Math.PI * 2);
     ctx.fill();
+    ctx.globalAlpha = 1;
 
-    // Cute Droopy / Perked Ears
-    const earFlutter = Math.sin(frame * 0.1 + s.id) * 2;
-    ctx.fillStyle = '#fbcfe8';
+    // Head position: lowers while grazing with chewing bob, or rests serenely while sleeping
+    const chew = isGrazing ? Math.sin(frame * 0.3) * sz * 0.04 : 0;
+    const headX = sz * 0.58;
+    const headY = isGrazing ? sz * 0.22 + chew : isSleeping ? sz * 0.06 + breathe * 0.4 : -sz * 0.08;
+
+    // Black ears (behind the face)
+    const earFlutter = isSleeping ? 0 : Math.sin(frame * 0.1 + s.id) * 2;
+    ctx.fillStyle = SHEEP_BLACK;
     ctx.beginPath();
-    ctx.ellipse(headX - sz * 0.12, headY - sz * 0.08 + earFlutter, sz * 0.18, sz * 0.09, -0.4, 0, Math.PI * 2);
+    ctx.ellipse(headX - sz * 0.2, headY - sz * 0.04 + earFlutter, sz * 0.17, sz * 0.09, -0.5, 0, Math.PI * 2);
     ctx.fill();
-
     ctx.beginPath();
-    ctx.ellipse(headX + sz * 0.36, headY - sz * 0.04 - earFlutter, sz * 0.15, sz * 0.08, 0.4, 0, Math.PI * 2);
+    ctx.ellipse(headX + sz * 0.46, headY - sz * 0.02 - earFlutter, sz * 0.15, sz * 0.08, 0.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Horns for deep sleepers
-    if (s.hornType === 'spiral') {
+    // Black face
+    ctx.fillStyle = SHEEP_BLACK;
+    ctx.beginPath();
+    ctx.ellipse(headX + sz * 0.12, headY + sz * 0.04, sz * 0.38, sz * 0.36, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Wool fringe over the forehead
+    woolGroup([
+      [headX - sz * 0.12, headY - sz * 0.26, sz * 0.26, sz * 0.2],
+      [headX + sz * 0.1, headY - sz * 0.32, sz * 0.26, sz * 0.2],
+      [headX + sz * 0.3, headY - sz * 0.24, sz * 0.2, sz * 0.17],
+    ]);
+
+    // Optional horns (off by default)
+    if (SHOW_HORNS && s.hornType === 'spiral') {
       ctx.strokeStyle = '#f59e0b';
       ctx.lineWidth = sz * 0.09;
       ctx.beginPath();
-      ctx.arc(headX - sz * 0.05, headY - sz * 0.32, sz * 0.22, 0.8 * Math.PI, 1.8 * Math.PI);
+      ctx.arc(headX - sz * 0.05, headY - sz * 0.38, sz * 0.22, 0.8 * Math.PI, 1.8 * Math.PI);
       ctx.stroke();
-    } else if (s.hornType === 'small') {
+    } else if (SHOW_HORNS && s.hornType === 'small') {
       ctx.fillStyle = '#f59e0b';
       ctx.beginPath();
-      ctx.moveTo(headX - sz * 0.02, headY - sz * 0.28);
-      ctx.lineTo(headX - sz * 0.08, headY - sz * 0.44);
-      ctx.lineTo(headX + sz * 0.04, headY - sz * 0.32);
+      ctx.moveTo(headX - sz * 0.02, headY - sz * 0.34);
+      ctx.lineTo(headX - sz * 0.08, headY - sz * 0.5);
+      ctx.lineTo(headX + sz * 0.04, headY - sz * 0.38);
       ctx.fill();
     }
 
-    // Eyes: Blink animation
+    // Eyes: serene closed arc when sleeping/blinking, or white rings when awake
+    const eyeXs = [headX + sz * 0.02, headX + sz * 0.26];
+    const eyeY = headY + sz * 0.08;
+    const eyeR = sz * 0.075;
     const isBlinking = frame % 180 > 172;
-    if (isBlinking || s.eyeStyle === 'sleepy') {
-      ctx.strokeStyle = '#44403c';
-      ctx.lineWidth = 1.8;
+    ctx.strokeStyle = '#fafaf9';
+    ctx.lineWidth = Math.max(1.5, sz * 0.045);
+    ctx.lineCap = 'round';
+    for (const ex of eyeXs) {
       ctx.beginPath();
-      ctx.arc(headX + sz * 0.1, headY + sz * 0.02, sz * 0.07, 0.2 * Math.PI, 0.8 * Math.PI);
+      if (isSleeping || isBlinking || s.eyeStyle === 'sleepy') {
+        // Closed eyelid curve
+        ctx.arc(ex, eyeY - eyeR * 0.2, eyeR, 0.15 * Math.PI, 0.85 * Math.PI);
+      } else {
+        ctx.arc(ex, eyeY, eyeR, 0, Math.PI * 2);
+      }
       ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(headX + sz * 0.28, headY + sz * 0.02, sz * 0.07, 0.2 * Math.PI, 0.8 * Math.PI);
-      ctx.stroke();
-    } else {
-      ctx.fillStyle = '#1c1917';
-      ctx.beginPath();
-      ctx.arc(headX + sz * 0.1, headY + sz * 0.02, sz * 0.075, 0, Math.PI * 2);
-      ctx.arc(headX + sz * 0.28, headY + sz * 0.02, sz * 0.075, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(headX + sz * 0.12, headY, sz * 0.025, 0, Math.PI * 2);
-      ctx.arc(headX + sz * 0.3, headY, sz * 0.025, 0, Math.PI * 2);
-      ctx.fill();
     }
 
-    // Rosy Cheeks
-    ctx.fillStyle = 'rgba(244, 114, 182, 0.45)';
+    // Small Y mouth
+    ctx.strokeStyle = '#d6d3d1';
+    ctx.lineWidth = Math.max(1.2, sz * 0.035);
+    const mx = headX + sz * 0.14;
+    const my = headY + sz * 0.2;
     ctx.beginPath();
-    ctx.ellipse(headX + sz * 0.05, headY + sz * 0.14, sz * 0.09, sz * 0.055, 0, 0, Math.PI * 2);
-    ctx.ellipse(headX + sz * 0.32, headY + sz * 0.14, sz * 0.08, sz * 0.05, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Mouth
-    ctx.strokeStyle = '#57534e';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(headX + sz * 0.18, headY + sz * 0.14);
-    ctx.lineTo(headX + sz * 0.18, headY + sz * 0.2);
-    ctx.moveTo(headX + sz * 0.13, headY + sz * 0.24);
-    ctx.quadraticCurveTo(headX + sz * 0.18, headY + sz * 0.21, headX + sz * 0.23, headY + sz * 0.24);
+    ctx.moveTo(mx, my);
+    ctx.lineTo(mx, my + sz * 0.06);
+    ctx.moveTo(mx, my + sz * 0.06);
+    ctx.lineTo(mx - sz * 0.05, my + sz * 0.11);
+    ctx.moveTo(mx, my + sz * 0.06);
+    ctx.lineTo(mx + sz * 0.05, my + sz * 0.11);
     ctx.stroke();
 
-    // Hover Highlight outline
+    // Fresh green grass sprig chewing in mouth when grazing
+    if (isGrazing) {
+      ctx.strokeStyle = '#34d399';
+      ctx.lineWidth = Math.max(1.5, sz * 0.045);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(mx, my + sz * 0.03);
+      ctx.quadraticCurveTo(mx + sz * 0.12, my + sz * 0.01, mx + sz * 0.22, my - sz * 0.04);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(mx, my + sz * 0.03);
+      ctx.quadraticCurveTo(mx + sz * 0.09, my + sz * 0.08, mx + sz * 0.18, my + sz * 0.11);
+      ctx.stroke();
+    }
+
+    // Hover highlight outline
     if (isHovered) {
       ctx.strokeStyle = '#fde047';
       ctx.lineWidth = 2.5;
@@ -525,7 +618,7 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
       ctx.stroke();
     }
 
-    // Debug Steering Velocity Vector
+    // Debug steering velocity vector
     if (showDebug) {
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 2;
@@ -537,11 +630,12 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
 
     ctx.restore();
 
-    // Floating Name & Quality Tag if Hovered
+    // Floating name and quality tag when hovered
     if (isHovered) {
       ctx.save();
       ctx.font = '600 13px "Plus Jakarta Sans", sans-serif';
-      const label = `${s.name} (${s.hours}h · ${s.quality})`;
+      const statusLabel = isSleeping ? ' · Snoozing 💤' : isGrazing ? ' · Grazing 🌿' : '';
+      const label = `${s.name} (${s.hours}h · ${s.quality}${statusLabel})`;
       const textW = ctx.measureText(label).width;
 
       ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
@@ -558,6 +652,49 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(label, s.x, pillY - 2);
+      ctx.restore();
+    }
+  };
+
+  // Grass chew crumbs
+  const drawGrassCrumbs = (ctx: CanvasRenderingContext2D) => {
+    const list = grassCrumbsRef.current;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const p = list[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life -= 0.025;
+      if (p.life <= 0) {
+        list.splice(i, 1);
+        continue;
+      }
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.life;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  };
+
+  // Sleeping zZ snore particles
+  const drawSnoreParticles = (ctx: CanvasRenderingContext2D, frame: number) => {
+    const list = snoreParticlesRef.current;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const p = list[i];
+      p.y += p.vy;
+      p.x += Math.sin(frame * 0.08 + p.phase) * 0.35;
+      p.life -= 0.012;
+      if (p.life <= 0) {
+        list.splice(i, 1);
+        continue;
+      }
+      ctx.save();
+      ctx.font = `bold ${Math.round(p.size)}px "Plus Jakarta Sans", sans-serif`;
+      ctx.fillStyle = `rgba(186, 230, 253, ${p.life * 0.85})`;
+      ctx.shadowColor = 'rgba(56, 189, 248, 0.5)';
+      ctx.shadowBlur = 6;
+      ctx.fillText(p.text, p.x, p.y);
       ctx.restore();
     }
   };
@@ -582,24 +719,54 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
     }
   };
 
-  // Pet heart particles
-  const drawPetParticles = (ctx: CanvasRenderingContext2D) => {
-    if (petEffects.length === 0) return;
+  // Dreamy floating affection heart bubbles (matching the float of zZ snores)
+  const drawPetHeartParticles = (ctx: CanvasRenderingContext2D, frame: number) => {
+    const list = petHeartsRef.current;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const p = list[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.94; // air resistance
+      p.vy -= 0.025; // buoyancy float
+      p.life -= p.decay;
 
-    setPetEffects((prev) =>
-      prev
-        .map((p) => ({ ...p, y: p.y - 1.2, life: p.life - 0.025 }))
-        .filter((p) => p.life > 0)
-    );
+      if (p.life <= 0) {
+        list.splice(i, 1);
+        continue;
+      }
 
-    for (const p of petEffects) {
+      // Gentle rhythmic side-to-side wobble
+      const sway = Math.sin(frame * p.wobbleSpeed + p.wobblePhase) * 1.4;
+
       ctx.save();
-      ctx.fillStyle = `rgba(244, 114, 182, ${p.life})`;
-      ctx.translate(p.x, p.y);
-      ctx.scale(0.8 * p.life, 0.8 * p.life);
-      ctx.font = '20px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('💖', 0, 0);
+      ctx.translate(p.x + sway, p.y);
+      const scale = (0.75 + (1 - p.life) * 0.35) * (p.size / 14);
+      ctx.scale(scale, scale);
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 1.15));
+
+      // Dreamy glowing shadow
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 9;
+
+      // Draw vector heart
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.moveTo(0, 3);
+      ctx.bezierCurveTo(0, -3, -8, -3, -8, 3);
+      ctx.bezierCurveTo(-8, 9, 0, 13, 0, 16);
+      ctx.bezierCurveTo(0, 13, 8, 9, 8, 3);
+      ctx.bezierCurveTo(8, -3, 0, -3, 0, 3);
+      ctx.closePath();
+      ctx.fill();
+
+      // Soft white glossy shine bubble highlight
+      if (p.hasShine) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+        ctx.beginPath();
+        ctx.ellipse(-3, 2, 2, 1.2, -0.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
       ctx.restore();
     }
   };
@@ -634,14 +801,37 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
     for (let i = sheep.length - 1; i >= 0; i--) {
       const s = sheep[i];
       const d = Math.hypot(x - s.x, y - s.y);
-      if (d < s.size * 1.3) {
-        // Pet sheep
+      if (d < s.size * 1.35) {
+        // Wake up immediately if sleeping
+        if (s.isSleeping) {
+          s.isSleeping = false;
+          s.sleepTimer = 0;
+        }
         s.lastPetTime = Date.now();
-        soundEngine.playBleat(s.quality === 'Poor' ? 1.2 : s.quality === 'Great' ? 0.95 : 1.05);
+        // Play distinct acoustic bleat based on biometric sleep phenotype
+        const voice = getSheepBleatConfig(s);
+        soundEngine.playBleatVariation(voice.variety, voice.pitchMod);
         soundEngine.playPetSound();
 
-        // Spawn heart particle
-        setPetEffects((prev) => [...prev, { x: s.x, y: s.y - s.size * 0.8, life: 1.0 }]);
+        // Spawn a rich cluster of 7 dreamy floating heart bubbles
+        const heartColors = ['#f472b6', '#fb7185', '#ec4899', '#fda4af', '#f43f5e', '#ff70a6'];
+        for (let k = 0; k < 7; k++) {
+          const spreadAngle = -Math.PI / 2 + (Math.random() - 0.5) * 1.5;
+          const launchSpeed = 1.2 + Math.random() * 2.2;
+          petHeartsRef.current.push({
+            x: s.x + (Math.random() - 0.5) * s.size * 0.7,
+            y: s.y - s.size * 0.35 + (Math.random() - 0.5) * 12,
+            vx: Math.cos(spreadAngle) * launchSpeed,
+            vy: Math.sin(spreadAngle) * launchSpeed,
+            size: 11 + Math.random() * 8,
+            life: 1.0,
+            decay: 0.011 + Math.random() * 0.007,
+            wobblePhase: Math.random() * Math.PI * 2,
+            wobbleSpeed: 0.08 + Math.random() * 0.06,
+            color: heartColors[k % heartColors.length],
+            hasShine: Math.random() > 0.25,
+          });
+        }
 
         onSelectSheep(s);
         return;

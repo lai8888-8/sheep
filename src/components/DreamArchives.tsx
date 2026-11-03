@@ -197,10 +197,13 @@ export const DreamArchives: React.FC<DreamArchivesProps> = ({
                 <div className="flex items-center gap-3">
                   {/* Wool Swatch Avatar */}
                   <div
-                    className="w-10 h-10 rounded-xl border border-white/20 shadow-sm flex items-center justify-center font-bold text-slate-900 text-xs"
+                    className="w-10 h-10 rounded-xl border border-white/20 shadow-sm flex items-center justify-center shrink-0"
                     style={{ backgroundColor: s.woolColor }}
                   >
-                    🐑
+                    <div className="w-6 h-5 rounded-full bg-[#1c1917] flex items-center justify-center gap-1 shadow-sm">
+                      <span className="w-1 h-1 rounded-full border border-[#fafaf9] inline-block"></span>
+                      <span className="w-1 h-1 rounded-full border border-[#fafaf9] inline-block"></span>
+                    </div>
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-white font-display group-hover:text-emerald-300 transition-colors">

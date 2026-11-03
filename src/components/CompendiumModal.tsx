@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Sparkles, BookOpen, Sliders, Volume2, Heart, Award, CheckCircle2, Lock } from 'lucide-react';
 import { SheepCreature, SleepQuality, DreamType } from '../types/sheep';
-import { soundEngine } from '../audio/synth';
+import { soundEngine, getSheepBleatConfig } from '../audio/synth';
 
 interface CompendiumModalProps {
   isOpen: boolean;
@@ -44,7 +44,7 @@ export const CompendiumModal: React.FC<CompendiumModalProps> = ({
 
   if (!isOpen) return null;
 
-  // The 6 Archetypal Sheep Phenotypes
+  // The 6 Archetypal Sheep Phenotypes (Valais Blacknose / 参考图风格)
   const breeds: BreedArchetype[] = [
     {
       id: 'cotton_candy',
@@ -52,10 +52,10 @@ export const CompendiumModal: React.FC<CompendiumModalProps> = ({
       subtitle: '棉花糖美梦羊',
       tagline: 'Born from joyful dreams and serene nights.',
       condition: 'Good Dream + Great / Okay Sleep',
-      description: 'Coated in pastel strawberry and lavender wool puffs. Possesses high vitality, bouncy trot kinematics, and emits playful melodic bleats.',
+      description: 'Coated in pastel strawberry and lavender wool puffs with a jet-black face. Possesses high vitality, bouncy trot kinematics, and emits playful melodic bleats.',
       colorSwatch: '#fbcfe8',
       hornType: 'none',
-      aura: true,
+      aura: false,
       checkUnlocked: (flock) => flock.some((s) => s.dreamType === 'good'),
       getMatchingCount: (flock) => flock.filter((s) => s.dreamType === 'good' && s.hours < 8).length,
       samplePreset: { hours: 7.5, quality: 'Great', dreamType: 'good' },
@@ -66,10 +66,10 @@ export const CompendiumModal: React.FC<CompendiumModalProps> = ({
       subtitle: '星光守望羊',
       tagline: 'Born from deep, expansive slumber over 8 hours.',
       condition: 'Sleep ≥ 8.0 hrs + Good Dream',
-      description: 'A rare celestial entity crowned with golden spiral horns and a shimmering starlight aura. Exerts gentle social cohesion over neighboring sheep.',
+      description: 'A luminous entity crowned with golden starlight fleece and deep serene ring eyes. Exerts gentle social cohesion over neighboring sheep.',
       colorSwatch: '#fef08a',
-      hornType: 'spiral',
-      aura: true,
+      hornType: 'none',
+      aura: false,
       checkUnlocked: (flock) => flock.some((s) => s.hours >= 8 && s.dreamType === 'good'),
       getMatchingCount: (flock) => flock.filter((s) => s.hours >= 8 && s.dreamType === 'good').length,
       samplePreset: { hours: 9.0, quality: 'Great', dreamType: 'good' },
@@ -80,8 +80,8 @@ export const CompendiumModal: React.FC<CompendiumModalProps> = ({
       subtitle: '风暴灰云羊',
       tagline: 'The brave container of nocturnal nightmares.',
       condition: 'Nightmare Dream',
-      description: 'Cloaked in dark slate and volcanic charcoal wool. Tends to maintain higher personal space (repulsion force) and paces cautiously along the meadow edge.',
-      colorSwatch: '#64748b',
+      description: 'Cloaked in misty silver and volcanic ash wool, contrasting sharply with its black ears and face. Paces cautiously along the meadow perimeter.',
+      colorSwatch: '#94a3b8',
       hornType: 'none',
       aura: false,
       checkUnlocked: (flock) => flock.some((s) => s.dreamType === 'bad'),
@@ -94,7 +94,7 @@ export const CompendiumModal: React.FC<CompendiumModalProps> = ({
       subtitle: '青草晨露羊',
       tagline: 'Born from quiet, dreamless, restful nights.',
       condition: 'Neutral / Peaceful Dream',
-      description: 'Adorned in refreshing mint sage wool. Spends significant time in contemplative grazing, softly bobbing its muzzle into the green grass.',
+      description: 'Adorned in refreshing mint sage wool. Spends significant time in contemplative grazing, softly bobbing its black muzzle into the green grass.',
       colorSwatch: '#bbf7d0',
       hornType: 'none',
       aura: false,
@@ -108,7 +108,7 @@ export const CompendiumModal: React.FC<CompendiumModalProps> = ({
       subtitle: '午后小憩羊',
       tagline: 'Born from short restorative daytime naps.',
       condition: 'Sleep Duration ≤ 3.5 hrs',
-      description: 'A dainty, compact miniature sheep with sleepy crescent eyes. Ambles gently with shorter strides and loves resting under the afternoon sun.',
+      description: 'A dainty, compact miniature sheep with sleepy crescent ring eyes. Ambles gently with shorter strides and loves resting under the afternoon sky.',
       colorSwatch: '#c7d2fe',
       hornType: 'none',
       aura: false,
@@ -122,10 +122,10 @@ export const CompendiumModal: React.FC<CompendiumModalProps> = ({
       subtitle: '远古睡神羊',
       tagline: 'The mythical lord of profound healing sleep.',
       condition: 'Sleep Duration ≥ 9.5 hrs + Great Quality',
-      description: 'Possesses immense cloud-puff volume, regal golden spiraled horns, and a deep resonance bleat. A true testament to sublime sleep recovery.',
+      description: 'Possesses immense cloud-puff volume, regal apricot-cream wool density, and a deep resonance bleat. A true testament to sublime sleep recovery.',
       colorSwatch: '#fed7aa',
-      hornType: 'spiral',
-      aura: true,
+      hornType: 'none',
+      aura: false,
       checkUnlocked: (flock) => flock.some((s) => s.hours >= 9.5 && s.quality === 'Great'),
       getMatchingCount: (flock) => flock.filter((s) => s.hours >= 9.5 && s.quality === 'Great').length,
       samplePreset: { hours: 10.0, quality: 'Great', dreamType: 'good' },
@@ -250,13 +250,13 @@ export const CompendiumModal: React.FC<CompendiumModalProps> = ({
                         <div className="flex items-center gap-3">
                           {/* Creature avatar swatch */}
                           <div
-                            className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-md border border-white/20 relative shrink-0"
+                            className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-md border border-white/20 relative shrink-0 overflow-hidden"
                             style={{ backgroundColor: breed.colorSwatch }}
                           >
-                            <span>🐑</span>
-                            {breed.hornType === 'spiral' && (
-                              <span className="absolute -top-1.5 -right-1.5 text-xs">👑</span>
-                            )}
+                            <div className="w-7 h-6 rounded-full bg-[#1c1917] flex items-center justify-center gap-1 shadow-sm">
+                              <span className="w-1.5 h-1.5 rounded-full border border-[#fafaf9] inline-block"></span>
+                              <span className="w-1.5 h-1.5 rounded-full border border-[#fafaf9] inline-block"></span>
+                            </div>
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
@@ -319,25 +319,21 @@ export const CompendiumModal: React.FC<CompendiumModalProps> = ({
                 {/* Visual Phenotype Preview (5 cols) */}
                 <div className="md:col-span-5 p-6 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col items-center justify-center space-y-4 text-center">
                   <div className="relative">
-                    {/* Glowing aura if good */}
-                    {labDreamType === 'good' && (
-                      <div className="absolute inset-0 rounded-full bg-amber-400/20 blur-xl animate-pulse" />
-                    )}
                     <div
-                      className="w-24 h-24 rounded-3xl flex items-center justify-center text-4xl shadow-xl border-2 border-white/20 transition-all transform hover:scale-105 relative z-10"
+                      className="w-24 h-24 rounded-3xl flex flex-col items-center justify-center shadow-xl border-2 border-white/20 transition-all transform hover:scale-105 relative z-10"
                       style={{
                         backgroundColor:
                           labDreamType === 'good'
                             ? '#fbcfe8'
                             : labDreamType === 'bad'
-                            ? '#64748b'
+                            ? '#94a3b8'
                             : '#bbf7d0',
                       }}
                     >
-                      <span>🐑</span>
-                      {labHasHorns && (
-                        <span className="absolute -top-2 -right-2 text-xl">👑</span>
-                      )}
+                      <div className="w-14 h-12 rounded-full bg-[#1c1917] flex items-center justify-center gap-2 shadow-sm">
+                        <span className="w-2.5 h-2.5 rounded-full border-2 border-[#fafaf9] inline-block"></span>
+                        <span className="w-2.5 h-2.5 rounded-full border-2 border-[#fafaf9] inline-block"></span>
+                      </div>
                     </div>
                   </div>
 
@@ -356,20 +352,24 @@ export const CompendiumModal: React.FC<CompendiumModalProps> = ({
                         : 'Dewdrop Meadow Grazer'}
                     </h3>
                     <p className="text-xs text-slate-400 font-mono mt-0.5">
-                      Bio-scale: {labFinalSize}px · Trot pace: {labSpeed} px/f
+                      Bio-scale: {labFinalSize}px · Trot pace: {labSpeed} px/f · Valais Blacknose
                     </p>
                   </div>
 
                   <button
-                    onClick={() =>
-                      soundEngine.playBleat(
-                        labQuality === 'Poor' ? 1.25 : labQuality === 'Great' ? 0.95 : 1.05
-                      )
-                    }
+                    onClick={() => {
+                      const voice = getSheepBleatConfig({
+                        hours: labHours,
+                        size: 34,
+                        quality: labQuality,
+                        dreamType: labDreamType,
+                      });
+                      soundEngine.playBleatVariation(voice.variety, voice.pitchMod);
+                    }}
                     className="px-3.5 py-1.5 rounded-xl bg-cyan-950/60 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-900/60 text-xs font-semibold flex items-center gap-1.5 transition-colors"
                   >
                     <Volume2 className="w-3.5 h-3.5" />
-                    <span>Test Formant Vocal Bleat</span>
+                    <span>Test Parametric Bleat</span>
                   </button>
                 </div>
 
@@ -483,10 +483,13 @@ export const CompendiumModal: React.FC<CompendiumModalProps> = ({
                   >
                     <div className="flex items-center gap-3">
                       <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-base border border-white/20 shrink-0"
+                        className="w-10 h-10 rounded-xl flex items-center justify-center border border-white/20 shrink-0"
                         style={{ backgroundColor: s.woolColor }}
                       >
-                        🐑
+                        <div className="w-6 h-5 rounded-full bg-[#1c1917] flex items-center justify-center gap-1 shadow-sm">
+                          <span className="w-1 h-1 rounded-full border border-[#fafaf9] inline-block"></span>
+                          <span className="w-1 h-1 rounded-full border border-[#fafaf9] inline-block"></span>
+                        </div>
                       </div>
                       <div>
                         <h4 className="text-sm font-bold text-white font-display">{s.name}</h4>

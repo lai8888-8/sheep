@@ -32,6 +32,9 @@ export interface SheepCreature {
   energy: number; // 0 to 1
   isGrazing: boolean;
   grazingTimer: number;
+  isSleeping: boolean;
+  sleepTimer: number;
+  lastSnoreTime: number;
   lastPetTime: number;
 }
 

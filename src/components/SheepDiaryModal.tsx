@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, Heart, Sparkles, Clock, Calendar, ShieldCheck, Activity } from 'lucide-react';
 import { SheepCreature } from '../types/sheep';
-import { soundEngine } from '../audio/synth';
+import { soundEngine, getSheepBleatConfig } from '../audio/synth';
 
 interface SheepDiaryModalProps {
   sheep: SheepCreature | null;
@@ -16,8 +16,10 @@ export const SheepDiaryModal: React.FC<SheepDiaryModalProps> = ({
 }) => {
   if (!sheep) return null;
 
+  const voice = getSheepBleatConfig(sheep);
+
   const handlePet = () => {
-    soundEngine.playBleat(sheep.quality === 'Poor' ? 1.2 : sheep.quality === 'Great' ? 0.95 : 1.05);
+    soundEngine.playBleatVariation(voice.variety, voice.pitchMod);
     soundEngine.playPetSound();
     onPet(sheep);
   };
@@ -141,7 +143,7 @@ export const SheepDiaryModal: React.FC<SheepDiaryModalProps> = ({
               className="flex-1 py-2.5 px-4 rounded-xl bg-pink-500/15 hover:bg-pink-500/25 border border-pink-500/30 text-pink-300 text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-95"
             >
               <Heart className="w-4 h-4 text-pink-400 fill-pink-400/30" />
-              <span>Pet {sheep.name} (Bleat Baaa~)</span>
+              <span>Pet {sheep.name} ({voice.label} · Baaa~)</span>
             </button>
             <button
               onClick={onClose}

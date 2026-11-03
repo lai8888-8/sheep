@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sliders, Volume2, Sparkles, Activity, Eye, Zap, Info } from 'lucide-react';
+import { Sliders, Volume2, Sparkles, Activity, Eye, Zap, Info, Moon, Utensils } from 'lucide-react';
 import { DreamType, SleepQuality } from '../types/sheep';
-import { soundEngine } from '../audio/synth';
+import { soundEngine, getSheepBleatConfig } from '../audio/synth';
 
 export const CreatureLab: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -12,6 +12,7 @@ export const CreatureLab: React.FC = () => {
   const [dreamType, setDreamType] = useState<DreamType>('good');
   const [facing, setFacing] = useState<1 | -1>(1);
   const [isGrazing, setIsGrazing] = useState(false);
+  const [isSleeping, setIsSleeping] = useState(false);
 
   // Derived attributes
   const durationScale = Math.min(1.25, Math.max(0.8, 0.82 + hours * 0.035));
@@ -38,6 +39,7 @@ export const CreatureLab: React.FC = () => {
   }
 
   const finalSize = baseSize * durationScale;
+  const voice = getSheepBleatConfig({ hours, size: finalSize, quality, dreamType });
 
   let woolColor = '#fbcfe8';
   let woolSecondary = '#f472b6';
@@ -48,8 +50,8 @@ export const CreatureLab: React.FC = () => {
     woolSecondary = '#c084fc';
     auraGlow = true;
   } else if (dreamType === 'bad') {
-    woolColor = '#64748b';
-    woolSecondary = '#334155';
+    woolColor = '#94a3b8';
+    woolSecondary = '#64748b';
     auraGlow = false;
   } else {
     woolColor = '#bbf7d0';
@@ -96,25 +98,38 @@ export const CreatureLab: React.FC = () => {
       ctx.arc(cx, cy, 180, 0, Math.PI * 2);
       ctx.fill();
 
-      // Leg swing
-      legPhase += (isGrazing ? 0 : maxSpeed) * 0.08;
+      // Leg swing (stops if resting or grazing)
+      legPhase += (isGrazing || isSleeping ? 0 : maxSpeed) * 0.08;
 
-      // Draw Creature
+      // Draw Creature (Valais Blacknose Look matching FarmCanvas)
       ctx.save();
-      ctx.translate(cx, cy);
+      const sleepSink = isSleeping ? finalSize * 0.16 : 0;
+      ctx.translate(cx, cy + sleepSink);
       ctx.scale(facing * 1.5, 1.5); // 1.5x zoom in lab
 
       const sz = finalSize;
+      const wool = woolColor;
+      const SHEEP_BLACK = '#1c1917';
+      const cleanHex = wool.replace('#', '');
+      const n = parseInt(cleanHex.length === 3 ? cleanHex.split('').map((c) => c + c).join('') : cleanHex, 16);
+      const f = (v: number) => Math.max(0, Math.min(255, Math.round(v - 0.3 * 255)));
+      const outline = `rgb(${f((n >> 16) & 255)}, ${f((n >> 8) & 255)}, ${f(n & 255)})`;
+      const OW = Math.max(1.5, sz * 0.05);
 
-      if (auraGlow) {
-        const glow = ctx.createRadialGradient(0, 0, sz * 0.4, 0, 0, sz * 1.3);
-        glow.addColorStop(0, 'rgba(253, 224, 71, 0.35)');
-        glow.addColorStop(1, 'rgba(253, 224, 71, 0)');
-        ctx.fillStyle = glow;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, sz * 1.3, sz * 1.1, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      const woolGroup = (blobs: number[][]) => {
+        ctx.fillStyle = outline;
+        for (const [x, y, rx, ry] of blobs) {
+          ctx.beginPath();
+          ctx.ellipse(x, y, rx + OW, ry + OW, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = wool;
+        for (const [x, y, rx, ry] of blobs) {
+          ctx.beginPath();
+          ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      };
 
       // Shadow
       ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
@@ -122,153 +137,155 @@ export const CreatureLab: React.FC = () => {
       ctx.ellipse(0, sz * 0.65, sz * 1.05, sz * 0.24, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Legs
+      // Legs: folded hooves if sleeping, otherwise walking/standing legs
       const legLength = sz * 0.52;
-      const legWidth = Math.max(3.5, sz * 0.11);
+      const legWidth = Math.max(4, sz * 0.13);
       const legSwing = Math.sin(legPhase) * sz * 0.22;
-      ctx.lineWidth = legWidth;
-      ctx.lineCap = 'round';
 
-      const legPositions = [
-        { bx: -sz * 0.38, swing: legSwing },
-        { bx: -sz * 0.16, swing: -legSwing },
-        { bx: sz * 0.14, swing: legSwing },
-        { bx: sz * 0.36, swing: -legSwing },
-      ];
-
-      for (const leg of legPositions) {
-        const startY = sz * 0.35;
-        const endX = leg.bx + (isGrazing ? 0 : leg.swing);
-        const endY = startY + legLength;
-
-        ctx.strokeStyle = '#d6d3d1';
-        ctx.beginPath();
-        ctx.moveTo(leg.bx, startY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-
-        ctx.strokeStyle = '#78716c';
-        ctx.beginPath();
-        ctx.moveTo(endX, endY - 2);
-        ctx.lineTo(endX, endY + 2);
-        ctx.stroke();
+      if (isSleeping) {
+        ctx.fillStyle = SHEEP_BLACK;
+        const tuckY = sz * 0.36;
+        const hooves = [-sz * 0.36, -sz * 0.14, sz * 0.12, sz * 0.34];
+        for (const hx of hooves) {
+          ctx.beginPath();
+          ctx.ellipse(hx, tuckY, Math.max(3.5, sz * 0.11), Math.max(2.5, sz * 0.07), 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else {
+        const legPositions = [
+          { bx: -sz * 0.38, swing: legSwing },
+          { bx: -sz * 0.16, swing: -legSwing },
+          { bx: sz * 0.14, swing: legSwing },
+          { bx: sz * 0.36, swing: -legSwing },
+        ];
+        ctx.strokeStyle = SHEEP_BLACK;
+        ctx.lineWidth = legWidth;
+        ctx.lineCap = 'round';
+        for (const leg of legPositions) {
+          const startY = sz * 0.35;
+          const endX = leg.bx + (isGrazing ? 0 : leg.swing);
+          ctx.beginPath();
+          ctx.moveTo(leg.bx, startY);
+          ctx.lineTo(endX, startY + legLength);
+          ctx.stroke();
+        }
       }
 
-      // Tail
-      ctx.fillStyle = woolColor;
-      ctx.beginPath();
-      ctx.arc(-sz * 0.68, -sz * 0.05 + Math.sin(frame * 0.15) * 3, sz * 0.18, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Central Torso
-      ctx.beginPath();
-      ctx.ellipse(0, 0, sz * 1.15, sz * 0.88, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Satellite Puffs
+      // Wool body: tail, torso and satellite puffs (with gentle rhythmic breathing)
+      const tailWag = isSleeping ? 0 : Math.sin(frame * 0.15) * 3;
+      const breathe = isSleeping ? Math.sin(frame * 0.05) * sz * 0.035 : 0;
       const puffR = sz * 0.32;
-      const puffs = [
-        [-sz * 0.5, -sz * 0.15],
-        [-sz * 0.38, -sz * 0.35],
-        [-sz * 0.15, -sz * 0.42],
-        [sz * 0.1, -sz * 0.42],
-        [sz * 0.32, -sz * 0.32],
-        [sz * 0.45, -sz * 0.1],
-        [sz * 0.35, sz * 0.18],
-        [sz * 0.12, sz * 0.35],
-        [-sz * 0.18, sz * 0.35],
-        [-sz * 0.42, sz * 0.2],
+      const bodyBlobs: number[][] = [
+        [-sz * 0.68, -sz * 0.05 + tailWag, sz * 0.18, sz * 0.18],
+        [0, 0, sz * 1.15 + breathe, sz * 0.88 + breathe],
+        [-sz * 0.5, -sz * 0.15, puffR, puffR],
+        [-sz * 0.38, -sz * 0.35, puffR, puffR],
+        [-sz * 0.15, -sz * 0.42, puffR, puffR],
+        [sz * 0.1, -sz * 0.42, puffR, puffR],
+        [sz * 0.32, -sz * 0.32, puffR, puffR],
+        [sz * 0.45, -sz * 0.1, puffR, puffR],
+        [sz * 0.35, sz * 0.18, puffR, puffR],
+        [sz * 0.12, sz * 0.35, puffR, puffR],
+        [-sz * 0.18, sz * 0.35, puffR, puffR],
+        [-sz * 0.42, sz * 0.2, puffR, puffR],
       ];
-      for (const p of puffs) {
-        ctx.beginPath();
-        ctx.arc(p[0], p[1], puffR, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      woolGroup(bodyBlobs);
 
-      // Head
-      const headOffsetY = isGrazing ? sz * 0.22 : -sz * 0.08;
-      const headX = sz * 0.58;
-      const headY = headOffsetY;
-
-      ctx.beginPath();
-      ctx.ellipse(headX, headY, sz * 0.6, sz * 0.55, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Crown bangs
+      // Soft shade patches
+      ctx.globalAlpha = 0.35;
       ctx.fillStyle = woolSecondary;
       ctx.beginPath();
-      ctx.arc(headX - sz * 0.14, headY - sz * 0.34, sz * 0.22, 0, Math.PI * 2);
-      ctx.arc(headX + sz * 0.06, headY - sz * 0.38, sz * 0.22, 0, Math.PI * 2);
-      ctx.arc(headX + sz * 0.24, headY - sz * 0.3, sz * 0.18, 0, Math.PI * 2);
+      ctx.ellipse(-sz * 0.1, sz * 0.5, sz * 0.7, sz * 0.2, 0, 0, Math.PI * 2);
       ctx.fill();
-
-      // Face skin
-      ctx.fillStyle = '#ffedd5';
       ctx.beginPath();
-      ctx.ellipse(headX + sz * 0.14, headY + sz * 0.04, sz * 0.38, sz * 0.34, 0, 0, Math.PI * 2);
+      ctx.ellipse(-sz * 0.2, -sz * 0.45, sz * 0.45, sz * 0.16, -0.15, 0, Math.PI * 2);
       ctx.fill();
+      ctx.globalAlpha = 1;
 
-      // Ears
-      const earFlutter = Math.sin(frame * 0.1) * 2;
-      ctx.fillStyle = '#fbcfe8';
+      // Head position with chewing bob or serene resting position
+      const chew = isGrazing ? Math.sin(frame * 0.3) * sz * 0.04 : 0;
+      const headX = sz * 0.58;
+      const headY = isGrazing ? sz * 0.22 + chew : isSleeping ? sz * 0.06 + breathe * 0.4 : -sz * 0.08;
+
+      // Black ears
+      const earFlutter = isSleeping ? 0 : Math.sin(frame * 0.1) * 2;
+      ctx.fillStyle = SHEEP_BLACK;
       ctx.beginPath();
-      ctx.ellipse(headX - sz * 0.12, headY - sz * 0.08 + earFlutter, sz * 0.18, sz * 0.09, -0.4, 0, Math.PI * 2);
+      ctx.ellipse(headX - sz * 0.2, headY - sz * 0.04 + earFlutter, sz * 0.17, sz * 0.09, -0.5, 0, Math.PI * 2);
       ctx.fill();
-
       ctx.beginPath();
-      ctx.ellipse(headX + sz * 0.36, headY - sz * 0.04 - earFlutter, sz * 0.15, sz * 0.08, 0.4, 0, Math.PI * 2);
+      ctx.ellipse(headX + sz * 0.46, headY - sz * 0.02 - earFlutter, sz * 0.15, sz * 0.08, 0.5, 0, Math.PI * 2);
       ctx.fill();
 
-      // Horns
-      if (hasHorns) {
-        ctx.strokeStyle = '#f59e0b';
-        ctx.lineWidth = sz * 0.09;
-        ctx.beginPath();
-        ctx.arc(headX - sz * 0.05, headY - sz * 0.32, sz * 0.22, 0.8 * Math.PI, 1.8 * Math.PI);
-        ctx.stroke();
-      }
+      // Black face
+      ctx.fillStyle = SHEEP_BLACK;
+      ctx.beginPath();
+      ctx.ellipse(headX + sz * 0.12, headY + sz * 0.04, sz * 0.38, sz * 0.36, 0, 0, Math.PI * 2);
+      ctx.fill();
 
-      // Eyes
+      // Wool fringe over forehead
+      woolGroup([
+        [headX - sz * 0.12, headY - sz * 0.26, sz * 0.26, sz * 0.2],
+        [headX + sz * 0.1, headY - sz * 0.32, sz * 0.26, sz * 0.2],
+        [headX + sz * 0.3, headY - sz * 0.24, sz * 0.2, sz * 0.17],
+      ]);
+
+      // Eyes: white rings, or closed white arcs when sleeping / sleepy / blinking
+      const eyeXs = [headX + sz * 0.02, headX + sz * 0.26];
+      const eyeY = headY + sz * 0.08;
+      const eyeR = sz * 0.075;
       const isBlink = frame % 150 > 142;
-      if (isBlink || quality === 'Poor') {
-        ctx.strokeStyle = '#44403c';
-        ctx.lineWidth = 1.8;
+      ctx.strokeStyle = '#fafaf9';
+      ctx.lineWidth = Math.max(1.5, sz * 0.045);
+      ctx.lineCap = 'round';
+      for (const ex of eyeXs) {
         ctx.beginPath();
-        ctx.arc(headX + sz * 0.1, headY + sz * 0.02, sz * 0.07, 0.2 * Math.PI, 0.8 * Math.PI);
+        if (isSleeping || isBlink || quality === 'Poor') {
+          ctx.arc(ex, eyeY - eyeR * 0.2, eyeR, 0.15 * Math.PI, 0.85 * Math.PI);
+        } else {
+          ctx.arc(ex, eyeY, eyeR, 0, Math.PI * 2);
+        }
         ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(headX + sz * 0.28, headY + sz * 0.02, sz * 0.07, 0.2 * Math.PI, 0.8 * Math.PI);
-        ctx.stroke();
-      } else {
-        ctx.fillStyle = '#1c1917';
-        ctx.beginPath();
-        ctx.arc(headX + sz * 0.1, headY + sz * 0.02, sz * 0.075, 0, Math.PI * 2);
-        ctx.arc(headX + sz * 0.28, headY + sz * 0.02, sz * 0.075, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(headX + sz * 0.12, headY, sz * 0.025, 0, Math.PI * 2);
-        ctx.arc(headX + sz * 0.3, headY, sz * 0.025, 0, Math.PI * 2);
-        ctx.fill();
       }
 
-      // Cheeks
-      ctx.fillStyle = 'rgba(244, 114, 182, 0.45)';
+      // Small Y mouth
+      ctx.strokeStyle = '#d6d3d1';
+      ctx.lineWidth = Math.max(1.2, sz * 0.035);
+      const mx = headX + sz * 0.14;
+      const my = headY + sz * 0.2;
       ctx.beginPath();
-      ctx.ellipse(headX + sz * 0.05, headY + sz * 0.14, sz * 0.09, sz * 0.055, 0, 0, Math.PI * 2);
-      ctx.ellipse(headX + sz * 0.32, headY + sz * 0.14, sz * 0.08, sz * 0.05, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Muzzle
-      ctx.strokeStyle = '#57534e';
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.moveTo(headX + sz * 0.18, headY + sz * 0.14);
-      ctx.lineTo(headX + sz * 0.18, headY + sz * 0.2);
-      ctx.moveTo(headX + sz * 0.13, headY + sz * 0.24);
-      ctx.quadraticCurveTo(headX + sz * 0.18, headY + sz * 0.21, headX + sz * 0.23, headY + sz * 0.24);
+      ctx.moveTo(mx, my);
+      ctx.lineTo(mx, my + sz * 0.06);
+      ctx.moveTo(mx, my + sz * 0.06);
+      ctx.lineTo(mx - sz * 0.05, my + sz * 0.11);
+      ctx.moveTo(mx, my + sz * 0.06);
+      ctx.lineTo(mx + sz * 0.05, my + sz * 0.11);
       ctx.stroke();
+
+      // Fresh green grass sprig chewing in mouth when grazing
+      if (isGrazing) {
+        ctx.strokeStyle = '#34d399';
+        ctx.lineWidth = Math.max(1.5, sz * 0.045);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(mx, my + sz * 0.03);
+        ctx.quadraticCurveTo(mx + sz * 0.12, my + sz * 0.01, mx + sz * 0.22, my - sz * 0.04);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(mx, my + sz * 0.03);
+        ctx.quadraticCurveTo(mx + sz * 0.09, my + sz * 0.08, mx + sz * 0.18, my + sz * 0.11);
+        ctx.stroke();
+      }
+
+      // Snooze zZ bubble on stage
+      if (isSleeping) {
+        ctx.save();
+        ctx.font = 'bold 16px "Plus Jakarta Sans", sans-serif';
+        const zAlpha = 0.5 + Math.sin(frame * 0.08) * 0.4;
+        ctx.fillStyle = `rgba(186, 230, 253, ${zAlpha})`;
+        ctx.fillText('zZ', headX + sz * 0.3, headY - sz * 0.35 + Math.sin(frame * 0.05) * 5);
+        ctx.restore();
+      }
 
       ctx.restore();
 
@@ -277,10 +294,22 @@ export const CreatureLab: React.FC = () => {
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-  }, [finalSize, woolColor, woolSecondary, auraGlow, hasHorns, quality, facing, isGrazing, maxSpeed]);
+  }, [finalSize, woolColor, woolSecondary, auraGlow, hasHorns, quality, facing, isGrazing, isSleeping, maxSpeed]);
 
   const handleTestBleat = () => {
-    soundEngine.playBleat(quality === 'Poor' ? 1.25 : quality === 'Great' ? 0.95 : 1.05);
+    soundEngine.playBleatVariation(voice.variety, voice.pitchMod);
+  };
+
+  const handleTestChew = () => {
+    setIsGrazing(true);
+    setIsSleeping(false);
+    soundEngine.playChewSound();
+  };
+
+  const handleTestSnore = () => {
+    setIsSleeping(true);
+    setIsGrazing(false);
+    soundEngine.playSnoreSound();
   };
 
   return (
@@ -298,13 +327,32 @@ export const CreatureLab: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={handleTestBleat}
-          className="px-3.5 py-2 rounded-xl bg-cyan-950/60 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-900/60 text-xs font-semibold flex items-center gap-2 transition-colors self-start sm:self-auto"
-        >
-          <Volume2 className="w-4 h-4" />
-          <span>Acoustic Vocal Test</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={handleTestChew}
+            title="Listen to procedural grass crunch bite"
+            className="px-3 py-1.5 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/60 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+          >
+            <Utensils className="w-3.5 h-3.5" />
+            <span>Munch Grass</span>
+          </button>
+          <button
+            onClick={handleTestSnore}
+            title="Listen to gentle procedural breathing snore"
+            className="px-3 py-1.5 rounded-xl bg-indigo-950/60 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-900/60 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+          >
+            <Moon className="w-3.5 h-3.5" />
+            <span>Gentle Snore</span>
+          </button>
+          <button
+            onClick={handleTestBleat}
+            title="Listen to parametric bleat vocalization based on current sleep data"
+            className="px-3.5 py-1.5 rounded-xl bg-cyan-950/60 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-900/60 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+          >
+            <Volume2 className="w-3.5 h-3.5" />
+            <span>Vocal: {voice.label}</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Grid: Visualizer Stage vs Parameter Sliders */}
@@ -339,11 +387,9 @@ export const CreatureLab: React.FC = () => {
               <span className="text-slate-500 text-[10px] block">Kinematic trot pace</span>
             </div>
             <div>
-              <span className="text-slate-500 block text-[11px]">Aura Status</span>
-              <span className={auraGlow ? 'text-pink-400 font-semibold' : 'text-slate-400'}>
-                {auraGlow ? 'Active Halo' : 'Dormant'}
-              </span>
-              <span className="text-slate-500 text-[10px] block">Lucid resonance</span>
+              <span className="text-slate-500 block text-[11px]">Phenotype Feature</span>
+              <span className="text-slate-300 font-semibold">Valais Blacknose</span>
+              <span className="text-slate-500 text-[10px] block">White ring eyes & black face</span>
             </div>
           </div>
         </div>
@@ -371,7 +417,7 @@ export const CreatureLab: React.FC = () => {
               className="w-full accent-cyan-400 cursor-pointer"
             />
             <p className="text-[11px] text-slate-500">
-              Hours scale cellular wool volume; ≥7.5h develops ancestral celestial horns.
+              Hours scale cellular wool volume and roundness across the pasture.
             </p>
           </div>
 
@@ -443,22 +489,50 @@ export const CreatureLab: React.FC = () => {
           </div>
 
           {/* Secondary Toggles */}
-          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
+          <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
             <button
               onClick={() => setFacing((f) => (f === 1 ? -1 : 1))}
-              className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white"
+              className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white"
             >
-              Flip Facing ({facing === 1 ? 'Right' : 'Left'})
+              Flip ({facing === 1 ? 'Right' : 'Left'})
             </button>
             <button
-              onClick={() => setIsGrazing((g) => !g)}
+              onClick={() => {
+                setIsGrazing((g) => {
+                  const next = !g;
+                  if (next) {
+                    setIsSleeping(false);
+                    soundEngine.playChewSound();
+                  }
+                  return next;
+                });
+              }}
               className={`px-3 py-1.5 rounded-lg border transition-colors ${
                 isGrazing
-                  ? 'bg-emerald-950 border-emerald-500/40 text-emerald-300'
+                  ? 'bg-emerald-950 border-emerald-500/40 text-emerald-300 font-semibold'
                   : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
               }`}
             >
-              {isGrazing ? 'Grazing Active' : 'Start Grazing'}
+              {isGrazing ? 'Grazing 🌿' : 'Simulate Grazing'}
+            </button>
+            <button
+              onClick={() => {
+                setIsSleeping((s) => {
+                  const next = !s;
+                  if (next) {
+                    setIsGrazing(false);
+                    soundEngine.playSnoreSound();
+                  }
+                  return next;
+                });
+              }}
+              className={`px-3 py-1.5 rounded-lg border transition-colors ${
+                isSleeping
+                  ? 'bg-indigo-950 border-indigo-500/40 text-indigo-300 font-semibold'
+                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
+              }`}
+            >
+              {isSleeping ? 'Snoozing 💤' : 'Simulate Sleep'}
             </button>
           </div>
         </div>

@@ -62,10 +62,10 @@ export function generateCreatureAttributes(
     auraGlow = true;
   } else if (dreamType === 'bad') {
     const badPalettes = [
-      { primary: '#64748b', secondary: '#475569' }, // Storm Slate
-      { primary: '#78716c', secondary: '#57534e' }, // Volcanic Ash
-      { primary: '#475569', secondary: '#334155' }, // Deep Twilight
-      { primary: '#52525b', secondary: '#3f3f46' }, // Charcoal Mist
+      { primary: '#94a3b8', secondary: '#64748b' }, // Lightened Storm Slate
+      { primary: '#a8a29e', secondary: '#78716c' }, // Lightened Volcanic Ash
+      { primary: '#cbd5e1', secondary: '#94a3b8' }, // Misty Silver Cloud
+      { primary: '#a1a1aa', secondary: '#71717a' }, // Smoky Moon Mist
     ];
     const picked = badPalettes[Math.floor(Math.random() * badPalettes.length)];
     woolColor = picked.primary;
@@ -123,6 +123,9 @@ export function generateCreatureAttributes(
     energy,
     isGrazing: false,
     grazingTimer: 0,
+    isSleeping: false,
+    sleepTimer: 0,
+    lastSnoreTime: 0,
     lastPetTime: 0,
   };
 }
@@ -142,7 +145,27 @@ export function updateFlock(
   for (let i = 0; i < sheep.length; i++) {
     const s = sheep[i];
 
-    // Grazing logic: sheep occasionally stops to munch on grass
+    // Bell summon wakes sleeping sheep immediately
+    if (targetPoint && s.isSleeping) {
+      s.isSleeping = false;
+      s.sleepTimer = 0;
+    }
+
+    // 1. Sleeping / Snoozing state
+    if (s.sleepTimer > 0) {
+      s.sleepTimer--;
+      s.isSleeping = true;
+      s.isGrazing = false;
+      s.vx *= 0.75;
+      s.vy *= 0.75;
+      s.x += s.vx;
+      s.y += s.vy;
+      continue;
+    } else {
+      s.isSleeping = false;
+    }
+
+    // 2. Grazing logic: sheep stops to munch on grass
     if (s.grazingTimer > 0) {
       s.grazingTimer--;
       s.vx *= 0.85;
@@ -153,9 +176,23 @@ export function updateFlock(
       continue;
     } else {
       s.isGrazing = false;
-      // 0.2% chance to begin grazing if not running towards a target
-      if (!targetPoint && Math.random() < 0.0025) {
-        s.grazingTimer = 90 + Math.floor(Math.random() * 140);
+    }
+
+    // Spontaneous natural idle behaviors (only when not running towards clover)
+    if (!targetPoint) {
+      // Chance to start grazing on the sweet grass
+      if (Math.random() < 0.0028) {
+        s.grazingTimer = 100 + Math.floor(Math.random() * 140);
+        s.isGrazing = true;
+        continue;
+      }
+
+      // Chance to lie down and take a nap
+      // Tired sheep (Poor sleep) nap more frequently; well-rested sheep nap briefly
+      const napChance = s.quality === 'Poor' ? 0.0032 : s.quality === 'Okay' ? 0.0018 : 0.001;
+      if (Math.random() < napChance) {
+        s.sleepTimer = 200 + Math.floor(Math.random() * 220);
+        s.isSleeping = true;
         continue;
       }
     }

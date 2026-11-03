@@ -9,9 +9,9 @@
 **Sleep Farm** is an interactive artificial life ecosystem that transforms circadian sleep records and dream diaries into autonomous virtual creatures. Rather than treating sleep as cold quantified telemetry, the project draws upon the universal folklore metaphor of *"counting sheep to fall asleep"* and reimagines it as an empathetic companion system.
 
 Every night's rest synthesizes an algorithmic sheep whose morphology and movement emerge from:
-1. **Sleep Duration (0.5h – 14h)**: Scales cellular wool volume, mass, and unlocks mythical celestial horns ($\ge 7.5\text{h}$).
-2. **Sleep Quality (Great / Okay / Poor)**: Regulates trot velocity, harmonic stride kinematics, eyelid alertness, and vitality aura.
-3. **Dream Sentiment (Good / Nightmare / Neutral)**: Alters wool pigmentation (chromatic pastel vs. storm-cloud ash vs. mint sage) and social repulsion distance.
+1. **Sleep Duration (0.5h – 14h)**: Scales cellular wool puff radius, body volume, and overall flock presence.
+2. **Sleep Quality (Great / Okay / Poor)**: Regulates trot velocity, harmonic stride kinematics, eyelid alertness, and vitality.
+3. **Dream Sentiment (Good / Nightmare / Neutral)**: Alters wool pigmentation (chromatic pastel vs. lightened storm ash vs. mint sage) and social repulsion distance.
 
 To prevent gamified exploitation and preserve ecological realism, the farm enforces a strict biological capacity limit of **two sheep per day** (one for night sleep, one for an afternoon nap).
 

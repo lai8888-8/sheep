@@ -106,15 +106,34 @@ export const Navigation: React.FC<NavigationProps> = ({
           {/* Procedural Audio Ambience Toggle */}
           <button
             onClick={onToggleAudio}
-            className={`p-2 rounded-xl border transition-colors ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-colors ${
               !isAudioMuted
-                ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40 hover:bg-emerald-900/60'
+                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/60 shadow-sm'
                 : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-800'
             }`}
-            title={isAudioMuted ? 'Unmute procedural soundscape' : 'Mute soundscape'}
+            title={
+              isAudioMuted
+                ? 'Unmute procedural soundscape'
+                : `Playing ${
+                    timeOfDay === 'night'
+                      ? 'Night Cicadas & Lullaby BGM'
+                      : timeOfDay === 'twilight'
+                      ? 'Twilight Breeze & Sunset Rhodes BGM'
+                      : 'Dawn Morning Birds & Dewdrop Chimes BGM'
+                  }`
+            }
             aria-label="Toggle Sound"
           >
-            {isAudioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            {isAudioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
+            <span className="hidden lg:inline text-[11px] font-medium font-mono">
+              {!isAudioMuted
+                ? timeOfDay === 'night'
+                  ? 'Night Cicadas & Lullaby'
+                  : timeOfDay === 'twilight'
+                  ? 'Sunset Rhodes'
+                  : 'Dawn Songbirds'
+                : 'BGM Muted'}
+            </span>
           </button>
         </div>
       </div>

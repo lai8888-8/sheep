@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SheepCreature, SleepQuality, DreamType } from './types/sheep';
 import { generateCreatureAttributes } from './simulation/flock';
-import { soundEngine } from './audio/synth';
+import { soundEngine, getSheepBleatConfig } from './audio/synth';
 import { Navigation } from './components/Navigation';
 import { FarmCanvas } from './simulation/FarmCanvas';
 import { FloatingSleepForm } from './components/FloatingSleepForm';
@@ -85,6 +85,15 @@ export default function App() {
     }
   }, [sheep]);
 
+  // Time of Day change handler: seamlessly crossfade procedural soundscape
+  const handleChangeTimeOfDay = (tod: 'night' | 'twilight' | 'dawn') => {
+    setTimeOfDay(tod);
+    soundEngine.setTimeOfDay(tod);
+    if (!isAudioMuted && !soundEngine.getIsAmbienceRunning()) {
+      soundEngine.startAmbience(tod);
+    }
+  };
+
   // Audio toggle
   const handleToggleAudio = () => {
     const nextMuted = !isAudioMuted;
@@ -92,7 +101,7 @@ export default function App() {
     soundEngine.setMuted(nextMuted);
 
     if (!nextMuted && !soundEngine.getIsAmbienceRunning()) {
-      soundEngine.startNightAmbience();
+      soundEngine.startAmbience(timeOfDay);
     }
   };
 
@@ -100,6 +109,9 @@ export default function App() {
   const handleRingBell = () => {
     soundEngine.playBellChime();
     soundEngine.playBleat(1.0);
+    if (!isAudioMuted && !soundEngine.getIsAmbienceRunning()) {
+      soundEngine.startAmbience(timeOfDay);
+    }
   };
 
   // Add new sheep from form
@@ -128,7 +140,8 @@ export default function App() {
     // Audio confirmation
     soundEngine.playBellChime();
     setTimeout(() => {
-      soundEngine.playBleat(newSheep.quality === 'Poor' ? 1.2 : newSheep.quality === 'Great' ? 0.95 : 1.05);
+      const voice = getSheepBleatConfig(newSheep);
+      soundEngine.playBleatVariation(voice.variety, voice.pitchMod);
     }, 200);
   };
 
@@ -175,7 +188,7 @@ export default function App() {
         onRingBell={handleRingBell}
         onResetDemo={handleResetDemo}
         timeOfDay={timeOfDay}
-        onChangeTimeOfDay={setTimeOfDay}
+        onChangeTimeOfDay={handleChangeTimeOfDay}
         flockCount={sheep.length}
       />
 
