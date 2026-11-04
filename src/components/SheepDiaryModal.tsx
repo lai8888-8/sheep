@@ -48,9 +48,24 @@ export const SheepDiaryModal: React.FC<SheepDiaryModalProps> = ({
           }}
         >
           <div className="z-10">
-            <span className="text-xs uppercase tracking-wider font-mono px-2 py-0.5 rounded bg-black/40 text-white backdrop-blur-sm">
-              Creature #{sheep.id}
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs uppercase tracking-wider font-mono px-2 py-0.5 rounded bg-black/40 text-white backdrop-blur-sm">
+                Creature #{sheep.id}
+              </span>
+              <span className={`text-xs px-2 py-0.5 rounded font-medium backdrop-blur-sm ${
+                sheep.gender === 'ram'
+                  ? 'bg-amber-500/30 text-amber-200 border border-amber-400/30'
+                  : 'bg-pink-500/30 text-pink-200 border border-pink-400/30'
+              }`}>
+                {sheep.gender === 'ram' ? '♂ Ram (公羊)' : '♀ Ewe (母羊)'}
+              </span>
+              {sheep.personality && (
+                <span className="text-xs px-2 py-0.5 rounded font-semibold bg-white/20 text-white border border-white/30 backdrop-blur-sm">
+                  {sheep.personality}
+                  {(sheep.hasRedBowTie || sheep.personality === '文静' || sheep.personality === '温顺' || sheep.personality === '善良') ? ' · 🎀 红色领结' : (sheep.hasHorns || sheep.personality === '活泼' || sheep.personality === '开朗' || sheep.personality === '暴躁') ? ' · 📐 黑色锥角' : ' · 🌙 闭目沉思'}
+                </span>
+              )}
+            </div>
             <h2 className="text-2xl font-bold text-white drop-shadow-md font-display mt-0.5">
               {sheep.name}
             </h2>
@@ -75,7 +90,7 @@ export const SheepDiaryModal: React.FC<SheepDiaryModalProps> = ({
                 <span>Sleep Recorded</span>
               </div>
               <div className="text-sm font-semibold font-mono text-white tabular-nums">
-                {sheep.hours} hours
+                {sheep.hours} hours ({sheep.quality})
               </div>
             </div>
 
@@ -95,32 +110,57 @@ export const SheepDiaryModal: React.FC<SheepDiaryModalProps> = ({
             <div className="flex items-center justify-between text-slate-400 pb-1 border-b border-slate-800/60">
               <span className="flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Phenotype Mapping</span>
+                <span>Phenotype & Personality Trait</span>
               </span>
-              <span className="font-mono text-slate-300">Bio-Parametric</span>
+              <span className="font-mono text-amber-300">
+                {sheep.personality || 'Serene'}
+              </span>
             </div>
 
             <div className="grid grid-cols-2 gap-y-2 text-slate-300">
               <div>
-                <span className="text-slate-500">Quality State: </span>
-                <span className="font-medium text-white">{sheep.quality}</span>
+                <span className="text-slate-500">Personality Type: </span>
+                <span className="font-semibold text-white">
+                  {sheep.personality || '文静'}
+                  <span className="text-slate-400 font-normal text-[11px] block">
+                    {sheep.personalityCategory === 'gentle' || (!sheep.personalityCategory && (sheep.personality === '文静' || sheep.personality === '温顺' || sheep.personality === '善良'))
+                      ? '温和/善意类 (Gentle)'
+                      : sheep.personalityCategory === 'lively' || (sheep.personality === '活泼' || sheep.personality === '开朗' || sheep.personality === '暴躁')
+                      ? '活力/激越类 (Lively)'
+                      : '忧郁/独处类 (Melancholic)'}
+                  </span>
+                </span>
               </div>
               <div>
-                <span className="text-slate-500">Body Scale: </span>
-                <span className="font-mono text-white">{Math.round(sheep.size)} px</span>
+                <span className="text-slate-500">Visual Accents: </span>
+                <span className="font-medium text-emerald-300">
+                  {(sheep.hasRedBowTie || sheep.personality === '文静' || sheep.personality === '温顺' || sheep.personality === '善良')
+                    ? '🎀 佩戴红色领结'
+                    : (sheep.hasHorns || sheep.personality === '活泼' || sheep.personality === '开朗' || sheep.personality === '暴躁')
+                    ? '📐 短小双黑色三角锥角'
+                    : '🌙 沉思闭目'}
+                </span>
               </div>
               <div>
-                <span className="text-slate-500">Dream State: </span>
-                <span className="font-medium text-white">{sheep.dreamType}</span>
+                <span className="text-slate-500">Wool & Scale: </span>
+                <span className="font-mono text-white">{Math.round(sheep.size)} px radius</span>
               </div>
               <div>
-                <span className="text-slate-500">Wool Puff Count: </span>
-                <span className="font-mono text-white">{sheep.puffCount} clusters</span>
+                <span className="text-slate-500">Social Habit: </span>
+                <span className="font-medium text-white">
+                  {sheep.personality === '暴躁'
+                    ? 'Determined Headbutt 💥'
+                    : sheep.personality === '活泼' || sheep.personality === '开朗'
+                    ? 'Joyful Play Hop ✨'
+                    : sheep.personality === '忧郁'
+                    ? 'Contemplative Reverie 🌾'
+                    : 'Gentle Grazing & Amble 🌿'}
+                </span>
               </div>
             </div>
 
             <div className="pt-1 text-[11px] text-slate-400">
-              <span>Mood classification: </span>
+              <span>Dream Influence: </span>
               <span className="text-slate-200">{dreamLabel}</span>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Volume2, VolumeX, Moon, BookOpen, Bell, RotateCcw } from 'lucide-react';
+import { Volume2, VolumeX, Moon, Sun, BookOpen, Bell, RotateCcw } from 'lucide-react';
+import { TimeOfDay } from '../types/sheep';
 
 interface NavigationProps {
   isAudioMuted: boolean;
@@ -7,8 +8,8 @@ interface NavigationProps {
   onOpenCompendium: () => void;
   onRingBell: () => void;
   onResetDemo: () => void;
-  timeOfDay: 'night' | 'twilight' | 'dawn';
-  onChangeTimeOfDay: (tod: 'night' | 'twilight' | 'dawn') => void;
+  timeOfDay: TimeOfDay;
+  onChangeTimeOfDay: (tod: TimeOfDay) => void;
   flockCount: number;
 }
 
@@ -29,7 +30,7 @@ export const Navigation: React.FC<NavigationProps> = ({
         {/* Zone 1: Single text element wordmark */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-emerald-950/80 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-            <Moon className="w-4 h-4" />
+            {timeOfDay === 'day' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
           </div>
           <div>
             <span className="text-lg font-semibold tracking-tight text-white font-display">
@@ -47,31 +48,48 @@ export const Navigation: React.FC<NavigationProps> = ({
           {/* Time of Day Cycle selector */}
           <div className="flex items-center bg-slate-900/80 p-0.5 rounded-xl border border-slate-800 text-xs text-slate-300">
             <button
-              onClick={() => onChangeTimeOfDay('night')}
+              onClick={() => onChangeTimeOfDay('day')}
               className={`px-2.5 py-1 rounded-lg transition-colors ${
-                timeOfDay === 'night' ? 'bg-slate-800 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                timeOfDay === 'day'
+                  ? 'bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
-              title="Night Sky"
+              title="Day Sky (蓝天白云)"
             >
-              🌙 Night
-            </button>
-            <button
-              onClick={() => onChangeTimeOfDay('twilight')}
-              className={`px-2.5 py-1 rounded-lg transition-colors ${
-                timeOfDay === 'twilight' ? 'bg-slate-800 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-slate-200'
-              }`}
-              title="Twilight Sky"
-            >
-              🌆 Twilight
+              ☀️ Day
             </button>
             <button
               onClick={() => onChangeTimeOfDay('dawn')}
               className={`px-2.5 py-1 rounded-lg transition-colors ${
-                timeOfDay === 'dawn' ? 'bg-slate-800 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                timeOfDay === 'dawn'
+                  ? 'bg-slate-800 text-white font-medium shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
-              title="Dawn Sky"
+              title="Dawn Sky (清晨)"
             >
               🌅 Dawn
+            </button>
+            <button
+              onClick={() => onChangeTimeOfDay('twilight')}
+              className={`px-2.5 py-1 rounded-lg transition-colors ${
+                timeOfDay === 'twilight'
+                  ? 'bg-slate-800 text-white font-medium shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Twilight Sky (黄昏)"
+            >
+              🌆 Twilight
+            </button>
+            <button
+              onClick={() => onChangeTimeOfDay('night')}
+              className={`px-2.5 py-1 rounded-lg transition-colors ${
+                timeOfDay === 'night'
+                  ? 'bg-slate-800 text-white font-medium shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Night Sky (夜晚)"
+            >
+              🌙 Night
             </button>
           </div>
 
@@ -115,7 +133,9 @@ export const Navigation: React.FC<NavigationProps> = ({
               isAudioMuted
                 ? 'Unmute procedural soundscape'
                 : `Playing ${
-                    timeOfDay === 'night'
+                    timeOfDay === 'day'
+                      ? 'Day Meadow Songbirds & Pastoral Chimes BGM'
+                      : timeOfDay === 'night'
                       ? 'Night Cicadas & Lullaby BGM'
                       : timeOfDay === 'twilight'
                       ? 'Twilight Breeze & Sunset Rhodes BGM'
@@ -127,7 +147,9 @@ export const Navigation: React.FC<NavigationProps> = ({
             {isAudioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
             <span className="hidden lg:inline text-[11px] font-medium font-mono">
               {!isAudioMuted
-                ? timeOfDay === 'night'
+                ? timeOfDay === 'day'
+                  ? 'Day Pastoral Songbirds'
+                  : timeOfDay === 'night'
                   ? 'Night Cicadas & Lullaby'
                   : timeOfDay === 'twilight'
                   ? 'Sunset Rhodes'

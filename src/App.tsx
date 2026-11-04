@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { SheepCreature, SleepQuality, DreamType } from './types/sheep';
-import { generateCreatureAttributes } from './simulation/flock';
+import { SheepCreature, SleepQuality, DreamType, TimeOfDay } from './types/sheep';
+import { generateCreatureAttributes, determinePersonalityAndTraits } from './simulation/flock';
 import { soundEngine, getSheepBleatConfig } from './audio/synth';
 import { Navigation } from './components/Navigation';
 import { FarmCanvas } from './simulation/FarmCanvas';
@@ -51,7 +51,7 @@ const INITIAL_DEMO_SHEEP: Array<{
 ];
 
 export default function App() {
-  const [timeOfDay, setTimeOfDay] = useState<'night' | 'twilight' | 'dawn'>('night');
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('day');
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isCompendiumOpen, setIsCompendiumOpen] = useState(false);
   const [selectedSheep, setSelectedSheep] = useState<SheepCreature | null>(null);
@@ -59,11 +59,44 @@ export default function App() {
   // Initialize flock with localStorage persistence
   const [sheep, setSheep] = useState<SheepCreature[]>(() => {
     try {
-      const saved = localStorage.getItem('sleep_farm_sheep_data_v2');
+      const saved = localStorage.getItem('sleep_farm_sheep_data_v3') || localStorage.getItem('sleep_farm_sheep_data_v2');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          return parsed.map((item: SheepCreature, idx: number) => {
+            const gender = item.gender || (idx % 2 === 0 ? 'ram' : 'ewe');
+            // If existing sheep lacks personality, dynamically derive it
+            let personality = item.personality;
+            let personalityCategory = item.personalityCategory;
+            let hasHorns = item.hasHorns;
+            let hasRedBowTie = item.hasRedBowTie;
+            let hasClosedEyes = item.hasClosedEyes;
+
+            if (!personality) {
+              const traits = determinePersonalityAndTraits(item.dreamType, item.quality, item.hours, gender);
+              personality = traits.personality;
+              personalityCategory = traits.personalityCategory;
+              hasHorns = traits.hasHorns;
+              hasRedBowTie = traits.hasRedBowTie;
+              hasClosedEyes = traits.hasClosedEyes;
+            }
+
+            return {
+              ...item,
+              gender,
+              personality,
+              personalityCategory: personalityCategory || 'gentle',
+              hasHorns: hasHorns ?? (personality === '活泼' || personality === '开朗' || personality === '暴躁'),
+              hasRedBowTie: hasRedBowTie ?? (personality === '文静' || personality === '温顺' || personality === '善良'),
+              hasClosedEyes: hasClosedEyes ?? (personality === '忧郁'),
+              socialAction: null,
+              socialTimer: 0,
+              scratchType: null,
+              scratchTimer: 0,
+              jumpY: 0,
+              headbuttOffset: 0,
+            };
+          });
         }
       }
     } catch {
@@ -79,14 +112,14 @@ export default function App() {
   // Save sheep to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem('sleep_farm_sheep_data_v2', JSON.stringify(sheep));
+      localStorage.setItem('sleep_farm_sheep_data_v3', JSON.stringify(sheep));
     } catch {
       // Ignore
     }
   }, [sheep]);
 
   // Time of Day change handler: seamlessly crossfade procedural soundscape
-  const handleChangeTimeOfDay = (tod: 'night' | 'twilight' | 'dawn') => {
+  const handleChangeTimeOfDay = (tod: TimeOfDay) => {
     setTimeOfDay(tod);
     soundEngine.setTimeOfDay(tod);
     if (!isAudioMuted && !soundEngine.getIsAmbienceRunning()) {
@@ -167,6 +200,7 @@ export default function App() {
     );
     setSheep(defaults);
     try {
+      localStorage.removeItem('sleep_farm_sheep_data_v3');
       localStorage.removeItem('sleep_farm_sheep_data_v2');
     } catch {
       // Ignore

@@ -4,6 +4,8 @@
  * bell chimes, and nocturnal meadow crickets with zero external audio assets.
  */
 
+import { TimeOfDay } from '../types/sheep';
+
 export type BleatVariety = 'classic' | 'baby' | 'deep' | 'double' | 'purr';
 
 class SoundEngine {
@@ -12,7 +14,7 @@ class SoundEngine {
   private masterGain: GainNode | null = null;
   private isAmbienceRunning = false;
   private isMuted = false;
-  private timeOfDay: 'night' | 'twilight' | 'dawn' = 'night';
+  private timeOfDay: TimeOfDay = 'day';
 
   private droneOsc1: OscillatorNode | null = null;
   private droneOsc2: OscillatorNode | null = null;
@@ -369,14 +371,102 @@ class SoundEngine {
   }
 
   /**
+   * 💥 Playful Headbutt Sound: Cute soft wooden tap / knock for rams bumping heads
+   */
+  public playBonkSound() {
+    try {
+      this.initContext();
+      if (!this.ctx || !this.masterGain || this.isMuted) return;
+
+      const t = this.ctx.currentTime;
+
+      // Low wooden thump
+      const osc = this.ctx.createOscillator();
+      const oscGain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(220, t);
+      osc.frequency.exponentialRampToValueAtTime(75, t + 0.11);
+
+      oscGain.gain.setValueAtTime(0.18, t);
+      oscGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+
+      osc.connect(oscGain);
+      oscGain.connect(this.masterGain);
+      osc.start(t);
+      osc.stop(t + 0.11);
+
+      // Cute wooden tap click
+      const noiseBuffer = this.createNoiseBuffer(0.04);
+      if (noiseBuffer) {
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = noiseBuffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1400, t);
+        filter.Q.setValueAtTime(5.5, t);
+
+        const nGain = this.ctx.createGain();
+        nGain.gain.setValueAtTime(0.12, t);
+        nGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+
+        noise.connect(filter);
+        filter.connect(nGain);
+        nGain.connect(this.masterGain);
+        noise.start(t);
+        noise.stop(t + 0.04);
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  /**
+   * ✨ Cheerful Social Chime: Happy ascending two-tone chirp after sheep play together
+   */
+  public playHappyChirpSound() {
+    try {
+      this.initContext();
+      if (!this.ctx || !this.masterGain || this.isMuted) return;
+
+      const t = this.ctx.currentTime;
+      const notes = [659.25, 880.0]; // E5 -> A5
+      notes.forEach((freq, idx) => {
+        if (!this.ctx || !this.masterGain) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        const st = t + idx * 0.08;
+        osc.frequency.setValueAtTime(freq, st);
+        gain.gain.setValueAtTime(0.0001, st);
+        gain.gain.linearRampToValueAtTime(0.12, st + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, st + 0.32);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(st);
+        osc.stop(st + 0.32);
+      });
+    } catch {
+      // Ignore
+    }
+  }
+
+  /**
    * Set and transition active Time of Day ambiance
    */
-  public setTimeOfDay(tod: 'night' | 'twilight' | 'dawn') {
+  /**
+   * Set and transition active Time of Day ambiance
+   */
+  public setTimeOfDay(tod: TimeOfDay) {
     this.timeOfDay = tod;
     if (this.isAmbienceRunning && this.ctx && this.droneFilter) {
       const t = this.ctx.currentTime;
       // Smooth drone frequency and filter crossfade
-      if (tod === 'night') {
+      if (tod === 'day') {
+        this.droneOsc1?.frequency.linearRampToValueAtTime(146.83, t + 2.0); // D3
+        this.droneOsc2?.frequency.linearRampToValueAtTime(220.00, t + 2.0); // A3
+        this.droneFilter.frequency.linearRampToValueAtTime(480, t + 2.0);
+      } else if (tod === 'night') {
         this.droneOsc1?.frequency.linearRampToValueAtTime(77.78, t + 2.0); // Eb2
         this.droneOsc2?.frequency.linearRampToValueAtTime(116.54, t + 2.0); // Bb2
         this.droneFilter.frequency.linearRampToValueAtTime(170, t + 2.0);
@@ -393,14 +483,14 @@ class SoundEngine {
     }
   }
 
-  public getTimeOfDay() {
+  public getTimeOfDay(): TimeOfDay {
     return this.timeOfDay;
   }
 
   /**
    * Start procedural soothing BGM and nature soundscape according to time of day
    */
-  public startAmbience(tod?: 'night' | 'twilight' | 'dawn') {
+  public startAmbience(tod?: TimeOfDay) {
     if (tod) this.timeOfDay = tod;
     if (this.isAmbienceRunning) return;
 
@@ -416,11 +506,13 @@ class SoundEngine {
 
       // 1. Dual warm pastoral drone oscillators
       const initialFreqs =
-        this.timeOfDay === 'night'
+        this.timeOfDay === 'day'
+          ? [146.83, 220.0, 480]
+          : this.timeOfDay === 'night'
           ? [77.78, 116.54, 170]
           : this.timeOfDay === 'twilight'
           ? [87.31, 130.81, 260]
-          : [130.81, 196.00, 340];
+          : [130.81, 196.0, 340];
 
       this.droneOsc1 = this.ctx.createOscillator();
       this.droneOsc2 = this.ctx.createOscillator();
@@ -460,6 +552,7 @@ class SoundEngine {
 
   /**
    * Schedule soothing procedural nature sounds:
+   * - Day: Sunny meadow birds & refreshing summer breezes
    * - Night: Summer cicadas (蝉鸣) & night meadow crickets
    * - Twilight: Golden sunset gentle breeze murmurs
    * - Dawn: Morning birdsong chirps (晨鸣鸟语)
@@ -468,7 +561,9 @@ class SoundEngine {
     if (!this.isAmbienceRunning) return;
 
     const delay =
-      this.timeOfDay === 'night'
+      this.timeOfDay === 'day'
+        ? 2600 + Math.random() * 2400
+        : this.timeOfDay === 'night'
         ? 2200 + Math.random() * 2600
         : this.timeOfDay === 'dawn'
         ? 3200 + Math.random() * 3000
@@ -476,7 +571,13 @@ class SoundEngine {
 
     this.natureTimer = window.setTimeout(() => {
       if (this.isAmbienceRunning && !this.isMuted) {
-        if (this.timeOfDay === 'night') {
+        if (this.timeOfDay === 'day') {
+          if (Math.random() > 0.45) {
+            this.playMorningBirdsong();
+          } else {
+            this.playSunsetBreeze();
+          }
+        } else if (this.timeOfDay === 'night') {
           // Alternate between warm summer cicadas and cricket chirps
           if (Math.random() > 0.4) {
             this.playSummerCicadas();
@@ -680,13 +781,14 @@ class SoundEngine {
       const t = this.ctx.currentTime;
 
       // Select gentle soothing scale based on time of day
-      const scales = {
+      const scales: Record<TimeOfDay, number[]> = {
+        day: [392.00, 440.00, 493.88, 587.33, 659.25, 783.99], // G major sunny pastoral pentatonic
         night: [311.13, 392.0, 466.16, 523.25, 622.25, 783.99], // Eb lullaby pentatonic
         twilight: [349.23, 440.0, 523.25, 659.25, 783.99, 880.0], // Fmaj7 / Am sunset
         dawn: [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5], // C major dewy morning
       };
 
-      const scale = scales[this.timeOfDay] || scales.night;
+      const scale = scales[this.timeOfDay] || scales.day;
       const freq = scale[Math.floor(Math.random() * scale.length)];
 
       const osc = this.ctx.createOscillator();
@@ -751,7 +853,7 @@ class SoundEngine {
     this.stopAmbience();
   }
 
-  public toggleAmbience(tod?: 'night' | 'twilight' | 'dawn'): boolean {
+  public toggleAmbience(tod?: TimeOfDay): boolean {
     if (this.isAmbienceRunning) {
       this.stopAmbience();
       return false;

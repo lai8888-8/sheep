@@ -1,5 +1,21 @@
 export type DreamType = 'good' | 'bad' | 'neutral';
 export type SleepQuality = 'Great' | 'Okay' | 'Poor';
+export type TimeOfDay = 'day' | 'dawn' | 'twilight' | 'night';
+
+export type PersonalityCategory = 'gentle' | 'lively' | 'melancholy';
+
+export type PersonalityType =
+  // 温和/善意类
+  | '温顺'
+  | '文静'
+  | '善良'
+  // 活力/激越类
+  | '活泼'
+  | '开朗'
+  | '暴躁'
+  // 忧郁/独处类
+  | '忧郁'
+  | '独立';
 
 export interface SheepCreature {
   id: number;
@@ -12,6 +28,12 @@ export interface SheepCreature {
   isSample?: boolean;
   
   // Biological & Morphological Attributes
+  gender: 'ram' | 'ewe'; // Ram (公羊) or Ewe (母羊)
+  personality: PersonalityType;
+  personalityCategory: PersonalityCategory;
+  hasHorns: boolean; // Two short black triangular cone horns (短小的两个黑色三角锥)
+  hasRedBowTie: boolean; // Cute red ribbon bow tie on chest (红色领结)
+  hasClosedEyes: boolean; // Closed contemplative/sleepy eyes (眼睛是闭着的)
   size: number;
   woolColor: string;
   woolSecondaryColor: string;
@@ -36,6 +58,18 @@ export interface SheepCreature {
   sleepTimer: number;
   lastSnoreTime: number;
   lastPetTime: number;
+
+  // Social & Idle Behavior State
+  socialAction?: 'headbutt' | 'hop' | null;
+  socialTimer?: number;
+  socialDuration?: number;
+  socialPartnerId?: number | null;
+  lastSocialTime?: number;
+  scratchType?: 'ear_flutter' | 'head_shake' | 'scratch' | null;
+  scratchTimer?: number;
+  lastScratchTime?: number;
+  jumpY?: number;
+  headbuttOffset?: number;
 }
 
 export interface DreamFodder {

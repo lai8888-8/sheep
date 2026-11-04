@@ -492,8 +492,21 @@ export const CompendiumModal: React.FC<CompendiumModalProps> = ({
                         </div>
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-white font-display">{s.name}</h4>
-                        <div className="text-[11px] text-slate-400 font-mono">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h4 className="text-sm font-bold text-white font-display">{s.name}</h4>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium ${
+                            s.gender === 'ram' ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30' : 'bg-pink-500/20 text-pink-300 border border-pink-400/30'
+                          }`}>
+                            {s.gender === 'ram' ? '♂' : '♀'}
+                          </span>
+                          {s.personality && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-slate-800 text-slate-200 border border-slate-700">
+                              {s.personality}
+                              {(s.hasRedBowTie || s.personality === '文静' || s.personality === '温顺' || s.personality === '善良') ? ' 🎀' : (s.hasHorns || s.personality === '活泼' || s.personality === '开朗' || s.personality === '暴躁') ? ' 📐' : ' 🌙'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">
                           {s.hours}h · {s.quality} · {s.dreamType}
                         </div>
                       </div>

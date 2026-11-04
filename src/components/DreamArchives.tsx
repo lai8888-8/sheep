@@ -209,10 +209,19 @@ export const DreamArchives: React.FC<DreamArchivesProps> = ({
                     <h3 className="text-base font-bold text-white font-display group-hover:text-emerald-300 transition-colors">
                       {s.name}
                     </h3>
-                    <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono flex-wrap">
                       <span>#{s.id}</span>
                       <span>·</span>
                       <span>{s.date}</span>
+                      {s.personality && (
+                        <>
+                          <span>·</span>
+                          <span className="text-amber-300 font-sans font-medium">
+                            {s.personality}
+                            {(s.hasRedBowTie || s.personality === '文静' || s.personality === '温顺' || s.personality === '善良') ? ' 🎀' : (s.hasHorns || s.personality === '活泼' || s.personality === '开朗' || s.personality === '暴躁') ? ' 📐' : ' 🌙'}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

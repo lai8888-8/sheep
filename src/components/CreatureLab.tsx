@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sliders, Volume2, Sparkles, Activity, Eye, Zap, Info, Moon, Utensils } from 'lucide-react';
-import { DreamType, SleepQuality } from '../types/sheep';
+import { Sliders, Volume2, Sparkles, Activity, Eye, Zap, Info, Moon, Utensils, Heart } from 'lucide-react';
+import { DreamType, SleepQuality, PersonalityType } from '../types/sheep';
 import { soundEngine, getSheepBleatConfig } from '../audio/synth';
 
 export const CreatureLab: React.FC = () => {
@@ -10,6 +10,9 @@ export const CreatureLab: React.FC = () => {
   const [hours, setHours] = useState(8.0);
   const [quality, setQuality] = useState<SleepQuality>('Great');
   const [dreamType, setDreamType] = useState<DreamType>('good');
+  const [gender, setGender] = useState<'ram' | 'ewe'>('ram');
+  const [personality, setPersonality] = useState<PersonalityType>('文静');
+  const [activeGesture, setActiveGesture] = useState<'none' | 'headbutt' | 'hop' | 'ear_flutter' | 'head_shake'>('none');
   const [facing, setFacing] = useState<1 | -1>(1);
   const [isGrazing, setIsGrazing] = useState(false);
   const [isSleeping, setIsSleeping] = useState(false);
@@ -38,6 +41,12 @@ export const CreatureLab: React.FC = () => {
     maxSpeed = 1.15;
   }
 
+  // Modulate speed by personality
+  if (personality === '活泼') maxSpeed += 0.3;
+  else if (personality === '暴躁') maxSpeed += 0.2;
+  else if (personality === '文静' || personality === '温顺') maxSpeed = Math.max(0.7, maxSpeed - 0.2);
+  else if (personality === '忧郁') maxSpeed = Math.max(0.65, maxSpeed - 0.25);
+
   const finalSize = baseSize * durationScale;
   const voice = getSheepBleatConfig({ hours, size: finalSize, quality, dreamType });
 
@@ -59,7 +68,10 @@ export const CreatureLab: React.FC = () => {
     auraGlow = false;
   }
 
-  const hasHorns = hours >= 7.5;
+  // Visual traits based on personality
+  const hasHorns = personality === '活泼' || personality === '开朗' || personality === '暴躁' || (personality === '独立' && gender === 'ram');
+  const hasRedBowTie = personality === '文静' || personality === '温顺' || personality === '善良';
+  const hasClosedEyes = personality === '忧郁';
 
   // Render loop in lab canvas
   useEffect(() => {
@@ -101,10 +113,14 @@ export const CreatureLab: React.FC = () => {
       // Leg swing (stops if resting or grazing)
       legPhase += (isGrazing || isSleeping ? 0 : maxSpeed) * 0.08;
 
+      // Active gesture dynamics
+      const jumpY = activeGesture === 'hop' ? -Math.abs(Math.sin(frame * 0.14)) * (finalSize * 0.35) : 0;
+      const headbuttOffset = activeGesture === 'headbutt' ? Math.sin(frame * 0.12) * (finalSize * 0.22) : 0;
+
       // Draw Creature (Valais Blacknose Look matching FarmCanvas)
       ctx.save();
       const sleepSink = isSleeping ? finalSize * 0.16 : 0;
-      ctx.translate(cx, cy + sleepSink);
+      ctx.translate(cx + headbuttOffset * facing, cy + sleepSink + jumpY);
       ctx.scale(facing * 1.5, 1.5); // 1.5x zoom in lab
 
       const sz = finalSize;
@@ -132,9 +148,10 @@ export const CreatureLab: React.FC = () => {
       };
 
       // Shadow
+      const shadowScale = jumpY < 0 ? Math.max(0.4, 1 + jumpY * 0.03) : 1;
       ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
       ctx.beginPath();
-      ctx.ellipse(0, sz * 0.65, sz * 1.05, sz * 0.24, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, sz * 0.65 - jumpY, sz * 1.05 * shadowScale, sz * 0.24 * shadowScale, 0, 0, Math.PI * 2);
       ctx.fill();
 
       // Legs: folded hooves if sleeping, otherwise walking/standing legs
@@ -152,11 +169,12 @@ export const CreatureLab: React.FC = () => {
           ctx.fill();
         }
       } else {
+        const isHopping = activeGesture === 'hop';
         const legPositions = [
-          { bx: -sz * 0.38, swing: legSwing },
-          { bx: -sz * 0.16, swing: -legSwing },
-          { bx: sz * 0.14, swing: legSwing },
-          { bx: sz * 0.36, swing: -legSwing },
+          { bx: -sz * 0.38, swing: isHopping ? sz * 0.12 : legSwing },
+          { bx: -sz * 0.16, swing: isHopping ? -sz * 0.12 : -legSwing },
+          { bx: sz * 0.14, swing: isHopping ? sz * 0.12 : legSwing },
+          { bx: sz * 0.36, swing: isHopping ? -sz * 0.12 : -legSwing },
         ];
         ctx.strokeStyle = SHEEP_BLACK;
         ctx.lineWidth = legWidth;
@@ -204,11 +222,28 @@ export const CreatureLab: React.FC = () => {
 
       // Head position with chewing bob or serene resting position
       const chew = isGrazing ? Math.sin(frame * 0.3) * sz * 0.04 : 0;
-      const headX = sz * 0.58;
-      const headY = isGrazing ? sz * 0.22 + chew : isSleeping ? sz * 0.06 + breathe * 0.4 : -sz * 0.08;
+      let headX = sz * 0.58;
+      let headY = isGrazing ? sz * 0.22 + chew : isSleeping ? sz * 0.06 + breathe * 0.4 : -sz * 0.08;
+
+      if (activeGesture === 'headbutt') {
+        headY += sz * 0.12;
+        headX += sz * 0.06;
+      }
+
+      if (activeGesture === 'head_shake') {
+        const shake = Math.sin(frame * 0.55);
+        headX += shake * (sz * 0.09);
+        headY += Math.abs(shake) * (sz * 0.04);
+      }
 
       // Black ears
-      const earFlutter = isSleeping ? 0 : Math.sin(frame * 0.1) * 2;
+      const isEarFluttering = activeGesture === 'ear_flutter';
+      const earFlutter = isSleeping
+        ? 0
+        : isEarFluttering
+        ? Math.sin(frame * 0.85) * 6.5
+        : Math.sin(frame * 0.1) * 2;
+
       ctx.fillStyle = SHEEP_BLACK;
       ctx.beginPath();
       ctx.ellipse(headX - sz * 0.2, headY - sz * 0.04 + earFlutter, sz * 0.17, sz * 0.09, -0.5, 0, Math.PI * 2);
@@ -230,21 +265,143 @@ export const CreatureLab: React.FC = () => {
         [headX + sz * 0.3, headY - sz * 0.24, sz * 0.2, sz * 0.17],
       ]);
 
-      // Eyes: white rings, or closed white arcs when sleeping / sleepy / blinking
+      // --- HORNS: TWO SHORT BLACK TRIANGULAR CONES (短小的两个黑色三角锥) ---
+      if (hasHorns) {
+        ctx.fillStyle = SHEEP_BLACK;
+        ctx.strokeStyle = '#0c0a09';
+        ctx.lineWidth = Math.max(1.2, sz * 0.035);
+        ctx.lineJoin = 'round';
+
+        // Left Cone Horn
+        ctx.beginPath();
+        ctx.moveTo(headX - sz * 0.12, headY - sz * 0.24);
+        ctx.lineTo(headX - sz * 0.14, headY - sz * 0.46);
+        ctx.lineTo(headX - sz * 0.02, headY - sz * 0.28);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Right Cone Horn
+        ctx.beginPath();
+        ctx.moveTo(headX + sz * 0.11, headY - sz * 0.29);
+        ctx.lineTo(headX + sz * 0.20, headY - sz * 0.50);
+        ctx.lineTo(headX + sz * 0.23, headY - sz * 0.28);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // 3D cone ridge highlight
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.lineWidth = Math.max(1, sz * 0.025);
+        ctx.beginPath();
+        ctx.moveTo(headX - sz * 0.07, headY - sz * 0.26);
+        ctx.lineTo(headX - sz * 0.14, headY - sz * 0.46);
+        ctx.moveTo(headX + sz * 0.17, headY - sz * 0.285);
+        ctx.lineTo(headX + sz * 0.20, headY - sz * 0.50);
+        ctx.stroke();
+      }
+
+      // --- RED BOW TIE (红色领结) ---
+      if (hasRedBowTie) {
+        const bowX = headX - sz * 0.02;
+        const bowY = headY + sz * 0.38;
+
+        ctx.save();
+        // Left ribbon wing
+        ctx.beginPath();
+        ctx.moveTo(bowX, bowY);
+        ctx.lineTo(bowX - sz * 0.15, bowY - sz * 0.08);
+        ctx.lineTo(bowX - sz * 0.17, bowY + sz * 0.08);
+        ctx.closePath();
+        ctx.fillStyle = '#dc2626';
+        ctx.fill();
+        ctx.strokeStyle = '#991b1b';
+        ctx.lineWidth = Math.max(1, sz * 0.025);
+        ctx.stroke();
+
+        // Right ribbon wing
+        ctx.beginPath();
+        ctx.moveTo(bowX, bowY);
+        ctx.lineTo(bowX + sz * 0.15, bowY - sz * 0.06);
+        ctx.lineTo(bowX + sz * 0.14, bowY + sz * 0.09);
+        ctx.closePath();
+        ctx.fillStyle = '#ef4444';
+        ctx.fill();
+        ctx.strokeStyle = '#991b1b';
+        ctx.stroke();
+
+        // Ribbon tails
+        ctx.fillStyle = '#b91c1c';
+        ctx.beginPath();
+        ctx.moveTo(bowX - sz * 0.02, bowY + sz * 0.04);
+        ctx.lineTo(bowX - sz * 0.09, bowY + sz * 0.18);
+        ctx.lineTo(bowX - sz * 0.04, bowY + sz * 0.15);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(bowX + sz * 0.02, bowY + sz * 0.04);
+        ctx.lineTo(bowX + sz * 0.08, bowY + sz * 0.18);
+        ctx.lineTo(bowX + sz * 0.03, bowY + sz * 0.15);
+        ctx.closePath();
+        ctx.fill();
+
+        // Center Knot
+        ctx.beginPath();
+        ctx.arc(bowX, bowY, Math.max(2.5, sz * 0.055), 0, Math.PI * 2);
+        ctx.fillStyle = '#dc2626';
+        ctx.fill();
+        ctx.strokeStyle = '#7f1d1d';
+        ctx.stroke();
+
+        // Gloss highlight
+        ctx.fillStyle = 'rgba(254, 202, 202, 0.85)';
+        ctx.beginPath();
+        ctx.arc(bowX - sz * 0.015, bowY - sz * 0.015, Math.max(1, sz * 0.02), 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      // --- EYES: CLOSED FOR MELANCHOLY/SLEEPING, RING FOR AWAKE ---
       const eyeXs = [headX + sz * 0.02, headX + sz * 0.26];
       const eyeY = headY + sz * 0.08;
       const eyeR = sz * 0.075;
       const isBlink = frame % 150 > 142;
+      const eyesAreClosed = isSleeping || isBlink || hasClosedEyes || quality === 'Poor';
+
       ctx.strokeStyle = '#fafaf9';
       ctx.lineWidth = Math.max(1.5, sz * 0.045);
       ctx.lineCap = 'round';
       for (const ex of eyeXs) {
         ctx.beginPath();
-        if (isSleeping || isBlink || quality === 'Poor') {
-          ctx.arc(ex, eyeY - eyeR * 0.2, eyeR, 0.15 * Math.PI, 0.85 * Math.PI);
+        if (eyesAreClosed) {
+          ctx.arc(ex, eyeY - eyeR * 0.15, eyeR, 0.15 * Math.PI, 0.85 * Math.PI);
         } else {
           ctx.arc(ex, eyeY, eyeR, 0, Math.PI * 2);
         }
+        ctx.stroke();
+      }
+
+      // Melancholy cheek star shimmer
+      if (hasClosedEyes) {
+        ctx.fillStyle = 'rgba(186, 230, 253, 0.85)';
+        ctx.beginPath();
+        ctx.arc(headX + sz * 0.35, eyeY + sz * 0.08, Math.max(1.5, sz * 0.035), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Grumpy (暴躁) brows
+      if (personality === '暴躁' && !isSleeping) {
+        ctx.strokeStyle = '#fafaf9';
+        ctx.lineWidth = Math.max(1.5, sz * 0.04);
+        ctx.beginPath();
+        ctx.moveTo(eyeXs[0] - eyeR * 0.7, eyeY - eyeR * 1.3);
+        ctx.lineTo(eyeXs[0] + eyeR * 0.7, eyeY - eyeR * 0.8);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(eyeXs[1] - eyeR * 0.7, eyeY - eyeR * 0.8);
+        ctx.lineTo(eyeXs[1] + eyeR * 0.7, eyeY - eyeR * 1.3);
         ctx.stroke();
       }
 
@@ -287,6 +444,14 @@ export const CreatureLab: React.FC = () => {
         ctx.restore();
       }
 
+      // Cheerful mood bubble when hopping or headbutting
+      if (activeGesture === 'hop' || activeGesture === 'headbutt') {
+        ctx.save();
+        ctx.font = '16px sans-serif';
+        ctx.fillText(activeGesture === 'headbutt' ? '💥 😊' : '✨ 😊', headX - sz * 0.1, headY - sz * 0.5);
+        ctx.restore();
+      }
+
       ctx.restore();
 
       animId = requestAnimationFrame(render);
@@ -294,7 +459,7 @@ export const CreatureLab: React.FC = () => {
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-  }, [finalSize, woolColor, woolSecondary, auraGlow, hasHorns, quality, facing, isGrazing, isSleeping, maxSpeed]);
+  }, [finalSize, woolColor, woolSecondary, auraGlow, quality, facing, isGrazing, isSleeping, maxSpeed, gender, personality, hasHorns, hasRedBowTie, hasClosedEyes, activeGesture, hours]);
 
   const handleTestBleat = () => {
     soundEngine.playBleatVariation(voice.variety, voice.pitchMod);
@@ -382,14 +547,21 @@ export const CreatureLab: React.FC = () => {
               <span className="text-slate-500 text-[10px] block">base * (0.82 + h*0.035)</span>
             </div>
             <div>
-              <span className="text-slate-500 block text-[11px]">Gait Velocity</span>
-              <span className="text-amber-400 font-semibold">{maxSpeed.toFixed(2)} px/f</span>
-              <span className="text-slate-500 text-[10px] block">Kinematic trot pace</span>
+              <span className="text-slate-500 block text-[11px]">Personality & Accent</span>
+              <span className="text-amber-300 font-semibold flex items-center gap-1">
+                {personality}
+                {hasRedBowTie && ' · 🎀 领结'}
+                {hasHorns && ' · 📐 锥角'}
+                {hasClosedEyes && ' · 🌙 闭眼'}
+              </span>
+              <span className="text-slate-500 text-[10px] block">
+                {hasHorns ? '双黑色三角锥角' : hasRedBowTie ? '精致红色领结' : '沉思闭目'}
+              </span>
             </div>
             <div>
-              <span className="text-slate-500 block text-[11px]">Phenotype Feature</span>
-              <span className="text-slate-300 font-semibold">Valais Blacknose</span>
-              <span className="text-slate-500 text-[10px] block">White ring eyes & black face</span>
+              <span className="text-slate-500 block text-[11px]">Gait & Pace</span>
+              <span className="text-cyan-400 font-semibold">{maxSpeed.toFixed(2)} px/f</span>
+              <span className="text-slate-500 text-[10px] block">Kinematic trot velocity</span>
             </div>
           </div>
         </div>
@@ -488,6 +660,186 @@ export const CreatureLab: React.FC = () => {
             </p>
           </div>
 
+          {/* Personality Clusters & Visual Accents (性格与专属外观表征) */}
+          <div className="space-y-2.5 pt-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-300 font-medium">Personality & Visual Accent:</span>
+              <span className="text-[11px] font-mono text-amber-300">
+                {hasRedBowTie ? '🎀 红色领结' : hasHorns ? '📐 短小双黑色锥角' : '🌙 闭目沉思'}
+              </span>
+            </div>
+
+            {/* Cluster 1: 温和/善意类 */}
+            <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-rose-400 font-semibold">① 温和/善意类</span>
+                <span className="text-rose-300 font-mono text-[10px]">佩戴红色领结 🎀</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(['文静', '温顺', '善良'] as PersonalityType[]).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPersonality(p)}
+                    className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition-all ${
+                      personality === p
+                        ? 'bg-rose-950/80 border-rose-500/70 text-rose-200 font-semibold shadow-sm'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {p} {p === '文静' ? '🎀' : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Cluster 2: 活力/激越类 */}
+            <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-amber-400 font-semibold">② 活力/激越类</span>
+                <span className="text-amber-300 font-mono text-[10px]">生双黑色三角锥角 📐</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(['活泼', '开朗', '暴躁'] as PersonalityType[]).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPersonality(p)}
+                    className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition-all ${
+                      personality === p
+                        ? 'bg-amber-950/80 border-amber-500/70 text-amber-200 font-semibold shadow-sm'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {p} {p === '暴躁' ? '⚡' : '📐'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Cluster 3: 忧郁/独处类 */}
+            <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-cyan-400 font-semibold">③ 忧郁/独处类</span>
+                <span className="text-cyan-300 font-mono text-[10px]">闭目沉思 / 自由游弋 🌙</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {(['忧郁', '独立'] as PersonalityType[]).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPersonality(p)}
+                    className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition-all ${
+                      personality === p
+                        ? 'bg-cyan-950/80 border-cyan-500/70 text-cyan-200 font-semibold shadow-sm'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {p} {p === '忧郁' ? '🌙' : '🐾'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Gender Selector: Ram vs Ewe */}
+          <div className="space-y-1.5">
+            <span className="text-xs text-slate-300 font-medium block">Creature Gender:</span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setGender('ram')}
+                className={`py-2 px-3 rounded-xl border text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                  gender === 'ram'
+                    ? 'bg-amber-950/70 border-amber-500/50 text-amber-300 font-semibold shadow-sm'
+                    : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <span>♂ Ram (公羊)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setGender('ewe')}
+                className={`py-2 px-3 rounded-xl border text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                  gender === 'ewe'
+                    ? 'bg-pink-950/70 border-pink-500/50 text-pink-300 font-semibold shadow-sm'
+                    : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <span>♀ Ewe (母羊)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Behavioral Gesture Testing */}
+          <div className="space-y-1.5 pt-1">
+            <span className="text-xs text-slate-300 font-medium block">Simulate Interactive Behavior:</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveGesture('headbutt');
+                  setIsGrazing(false);
+                  setIsSleeping(false);
+                  soundEngine.playBonkSound();
+                }}
+                className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition-colors ${
+                  activeGesture === 'headbutt'
+                    ? 'bg-amber-950 border-amber-500/60 text-amber-200 font-semibold'
+                    : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:text-white'
+                }`}
+              >
+                Headbutt 💥
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveGesture('hop');
+                  setIsGrazing(false);
+                  setIsSleeping(false);
+                  soundEngine.playHappyChirpSound();
+                }}
+                className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition-colors ${
+                  activeGesture === 'hop'
+                    ? 'bg-emerald-950 border-emerald-500/60 text-emerald-200 font-semibold'
+                    : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:text-white'
+                }`}
+              >
+                Play Hop ✨
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveGesture(activeGesture === 'ear_flutter' ? 'none' : 'ear_flutter');
+                  setIsGrazing(false);
+                  setIsSleeping(false);
+                }}
+                className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition-colors ${
+                  activeGesture === 'ear_flutter'
+                    ? 'bg-cyan-950 border-cyan-500/60 text-cyan-200 font-semibold'
+                    : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:text-white'
+                }`}
+              >
+                Ear Flutter 🌾
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveGesture(activeGesture === 'head_shake' ? 'none' : 'head_shake');
+                  setIsGrazing(false);
+                  setIsSleeping(false);
+                }}
+                className={`py-1.5 px-2 rounded-lg border text-xs font-medium transition-colors ${
+                  activeGesture === 'head_shake'
+                    ? 'bg-purple-950 border-purple-500/60 text-purple-200 font-semibold'
+                    : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:text-white'
+                }`}
+              >
+                Head Shake 🎵
+              </button>
+            </div>
+          </div>
+
           {/* Secondary Toggles */}
           <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
             <button
@@ -498,6 +850,7 @@ export const CreatureLab: React.FC = () => {
             </button>
             <button
               onClick={() => {
+                setActiveGesture('none');
                 setIsGrazing((g) => {
                   const next = !g;
                   if (next) {
@@ -517,6 +870,7 @@ export const CreatureLab: React.FC = () => {
             </button>
             <button
               onClick={() => {
+                setActiveGesture('none');
                 setIsSleeping((s) => {
                   const next = !s;
                   if (next) {
@@ -534,6 +888,14 @@ export const CreatureLab: React.FC = () => {
             >
               {isSleeping ? 'Snoozing 💤' : 'Simulate Sleep'}
             </button>
+            {activeGesture !== 'none' && (
+              <button
+                onClick={() => setActiveGesture('none')}
+                className="px-2.5 py-1.5 rounded-lg bg-rose-950/60 border border-rose-500/30 text-rose-300 hover:bg-rose-900/60 text-xs"
+              >
+                Reset Idle
+              </button>
+            )}
           </div>
         </div>
       </div>
