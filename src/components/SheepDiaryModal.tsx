@@ -1,21 +1,34 @@
 import React from 'react';
-import { X, Heart, Sparkles, Clock, Calendar, ShieldCheck, Activity } from 'lucide-react';
+import { X, Heart, Sparkles, Clock, Calendar, Activity } from 'lucide-react';
 import { SheepCreature } from '../types/sheep';
 import { soundEngine, getSheepBleatConfig } from '../audio/synth';
+import {
+  Language,
+  translations,
+  getPersonalityLabel,
+  getPersonalityCategoryLabel,
+  getGenderLabel,
+  getQualityLabel,
+  getDreamTypeLabel,
+  getTraitBadgeLabel,
+} from '../i18n/translations';
 
 interface SheepDiaryModalProps {
   sheep: SheepCreature | null;
   onClose: () => void;
   onPet: (s: SheepCreature) => void;
+  currentLang?: Language;
 }
 
 export const SheepDiaryModal: React.FC<SheepDiaryModalProps> = ({
   sheep,
   onClose,
   onPet,
+  currentLang = 'en',
 }) => {
   if (!sheep) return null;
 
+  const t = translations[currentLang].sheepDiary;
   const voice = getSheepBleatConfig(sheep);
 
   const handlePet = () => {
@@ -24,12 +37,21 @@ export const SheepDiaryModal: React.FC<SheepDiaryModalProps> = ({
     onPet(sheep);
   };
 
-  const dreamLabel =
-    sheep.dreamType === 'good'
-      ? 'Lucid / Good Dream (Pastel Aura)'
-      : sheep.dreamType === 'bad'
-      ? 'Nightmare (Storm Charcoal)'
-      : 'Calm / Neutral (Sage Twilight)';
+  const dreamLabel = getDreamTypeLabel(sheep.dreamType, currentLang);
+  const personalityName = sheep.personality ? getPersonalityLabel(sheep.personality, currentLang) : (currentLang === 'zh' ? '文静' : 'Quiet');
+  const categoryName = sheep.personalityCategory
+    ? getPersonalityCategoryLabel(sheep.personalityCategory, currentLang)
+    : (currentLang === 'zh' ? '温和/善意类' : 'Gentle & Serene');
+  const traitBadge = getTraitBadgeLabel(sheep, currentLang);
+  const genderName = getGenderLabel(sheep.gender, currentLang);
+  const qualityName = getQualityLabel(sheep.quality, currentLang);
+
+  const getSocialHabitDescription = () => {
+    if (sheep.personality === '暴躁') return t.habits.grumpy;
+    if (sheep.personality === '活泼' || sheep.personality === '开朗') return t.habits.lively;
+    if (sheep.personality === '忧郁') return t.habits.melancholy;
+    return t.habits.gentle;
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
@@ -50,21 +72,18 @@ export const SheepDiaryModal: React.FC<SheepDiaryModalProps> = ({
           <div className="z-10">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs uppercase tracking-wider font-mono px-2 py-0.5 rounded bg-black/40 text-white backdrop-blur-sm">
-                Creature #{sheep.id}
+                {t.creatureNo}{sheep.id}
               </span>
               <span className={`text-xs px-2 py-0.5 rounded font-medium backdrop-blur-sm ${
                 sheep.gender === 'ram'
                   ? 'bg-amber-500/30 text-amber-200 border border-amber-400/30'
                   : 'bg-pink-500/30 text-pink-200 border border-pink-400/30'
               }`}>
-                {sheep.gender === 'ram' ? '♂ Ram (公羊)' : '♀ Ewe (母羊)'}
+                {genderName}
               </span>
-              {sheep.personality && (
-                <span className="text-xs px-2 py-0.5 rounded font-semibold bg-white/20 text-white border border-white/30 backdrop-blur-sm">
-                  {sheep.personality}
-                  {(sheep.hasRedBowTie || sheep.personality === '文静' || sheep.personality === '温顺' || sheep.personality === '善良') ? ' · 🎀 红色领结' : (sheep.hasHorns || sheep.personality === '活泼' || sheep.personality === '开朗' || sheep.personality === '暴躁') ? ' · 📐 黑色锥角' : ' · 🌙 闭目沉思'}
-                </span>
-              )}
+              <span className="text-xs px-2 py-0.5 rounded font-semibold bg-white/20 text-white border border-white/30 backdrop-blur-sm">
+                {personalityName} · {traitBadge}
+              </span>
             </div>
             <h2 className="text-2xl font-bold text-white drop-shadow-md font-display mt-0.5">
               {sheep.name}
@@ -74,6 +93,7 @@ export const SheepDiaryModal: React.FC<SheepDiaryModalProps> = ({
           <button
             onClick={onClose}
             className="z-10 p-1.5 rounded-full bg-black/30 hover:bg-black/50 text-white backdrop-blur-sm transition-colors"
+            aria-label={t.closeBtn}
           >
             <X className="w-5 h-5" />
           </button>
@@ -87,17 +107,17 @@ export const SheepDiaryModal: React.FC<SheepDiaryModalProps> = ({
             <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1">
               <div className="flex items-center gap-1.5 text-slate-400">
                 <Clock className="w-3.5 h-3.5 text-amber-400" />
-                <span>Sleep Recorded</span>
+                <span>{t.sleepRecorded}</span>
               </div>
               <div className="text-sm font-semibold font-mono text-white tabular-nums">
-                {sheep.hours} hours ({sheep.quality})
+                {sheep.hours} {t.hoursUnit} ({qualityName})
               </div>
             </div>
 
             <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1">
               <div className="flex items-center gap-1.5 text-slate-400">
                 <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Logged Date</span>
+                <span>{t.loggedDate}</span>
               </div>
               <div className="text-sm font-semibold font-mono text-white tabular-nums">
                 {sheep.date}
@@ -110,57 +130,43 @@ export const SheepDiaryModal: React.FC<SheepDiaryModalProps> = ({
             <div className="flex items-center justify-between text-slate-400 pb-1 border-b border-slate-800/60">
               <span className="flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Phenotype & Personality Trait</span>
+                <span>{t.phenotypeTitle}</span>
               </span>
               <span className="font-mono text-amber-300">
-                {sheep.personality || 'Serene'}
+                {personalityName}
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-y-2 text-slate-300">
               <div>
-                <span className="text-slate-500">Personality Type: </span>
-                <span className="font-semibold text-white">
-                  {sheep.personality || '文静'}
+                <span className="text-slate-500">{t.personalityLabel} </span>
+                <span className="font-semibold text-white block">
+                  {personalityName}
                   <span className="text-slate-400 font-normal text-[11px] block">
-                    {sheep.personalityCategory === 'gentle' || (!sheep.personalityCategory && (sheep.personality === '文静' || sheep.personality === '温顺' || sheep.personality === '善良'))
-                      ? '温和/善意类 (Gentle)'
-                      : sheep.personalityCategory === 'lively' || (sheep.personality === '活泼' || sheep.personality === '开朗' || sheep.personality === '暴躁')
-                      ? '活力/激越类 (Lively)'
-                      : '忧郁/独处类 (Melancholic)'}
+                    {categoryName}
                   </span>
                 </span>
               </div>
               <div>
-                <span className="text-slate-500">Visual Accents: </span>
-                <span className="font-medium text-emerald-300">
-                  {(sheep.hasRedBowTie || sheep.personality === '文静' || sheep.personality === '温顺' || sheep.personality === '善良')
-                    ? '🎀 佩戴红色领结'
-                    : (sheep.hasHorns || sheep.personality === '活泼' || sheep.personality === '开朗' || sheep.personality === '暴躁')
-                    ? '📐 短小双黑色三角锥角'
-                    : '🌙 沉思闭目'}
+                <span className="text-slate-500">{t.visualAccentLabel} </span>
+                <span className="font-medium text-emerald-300 block">
+                  {traitBadge}
                 </span>
               </div>
               <div>
-                <span className="text-slate-500">Wool & Scale: </span>
-                <span className="font-mono text-white">{Math.round(sheep.size)} px radius</span>
+                <span className="text-slate-500">{t.woolScaleLabel} </span>
+                <span className="font-mono text-white block">{Math.round(sheep.size)} {t.pxRadius}</span>
               </div>
               <div>
-                <span className="text-slate-500">Social Habit: </span>
-                <span className="font-medium text-white">
-                  {sheep.personality === '暴躁'
-                    ? 'Determined Headbutt 💥'
-                    : sheep.personality === '活泼' || sheep.personality === '开朗'
-                    ? 'Joyful Play Hop ✨'
-                    : sheep.personality === '忧郁'
-                    ? 'Contemplative Reverie 🌾'
-                    : 'Gentle Grazing & Amble 🌿'}
+                <span className="text-slate-500">{t.socialHabitLabel} </span>
+                <span className="font-medium text-white block">
+                  {getSocialHabitDescription()}
                 </span>
               </div>
             </div>
 
             <div className="pt-1 text-[11px] text-slate-400">
-              <span>Dream Influence: </span>
+              <span>{t.dreamInfluenceLabel} </span>
               <span className="text-slate-200">{dreamLabel}</span>
             </div>
           </div>
@@ -169,7 +175,7 @@ export const SheepDiaryModal: React.FC<SheepDiaryModalProps> = ({
           <div className="space-y-1.5">
             <span className="text-xs font-semibold text-slate-400 flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Dream Journal Excerpt:</span>
+              <span>{t.journalExcerptLabel}</span>
             </span>
             <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-sm text-slate-200 italic leading-relaxed">
               "{sheep.diary}"
@@ -183,13 +189,13 @@ export const SheepDiaryModal: React.FC<SheepDiaryModalProps> = ({
               className="flex-1 py-2.5 px-4 rounded-xl bg-pink-500/15 hover:bg-pink-500/25 border border-pink-500/30 text-pink-300 text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-95"
             >
               <Heart className="w-4 h-4 text-pink-400 fill-pink-400/30" />
-              <span>Pet {sheep.name} ({voice.label} · Baaa~)</span>
+              <span>{t.petBtn} {sheep.name} ({voice.label} · Baaa~)</span>
             </button>
             <button
               onClick={onClose}
-              className="py-2.5 px-5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 transition-colors"
+              className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors"
             >
-              Close
+              {t.closeBtn}
             </button>
           </div>
         </div>

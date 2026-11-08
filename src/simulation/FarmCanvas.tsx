@@ -2,12 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AmbientParticle, DreamFodder, SheepCreature, TimeOfDay } from '../types/sheep';
 import { updateFlock } from './flock';
 import { soundEngine, getSheepBleatConfig } from '../audio/synth';
+import { Language, translations, getPersonalityLabel, getGenderLabel, getQualityLabel } from '../i18n/translations';
 
 interface FarmCanvasProps {
   sheep: SheepCreature[];
   onSelectSheep: (sheep: SheepCreature) => void;
   timeOfDay: TimeOfDay;
   showDebugForces?: boolean;
+  currentLang?: Language;
 }
 
 export const FarmCanvas: React.FC<FarmCanvasProps> = ({
@@ -15,6 +17,7 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
   onSelectSheep,
   timeOfDay,
   showDebugForces = false,
+  currentLang = 'en',
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -1108,29 +1111,34 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
     if (isHovered) {
       ctx.save();
       ctx.font = '600 13px "Plus Jakarta Sans", sans-serif';
-      const genderTag = s.gender === 'ram' ? '♂ Ram' : '♀ Ewe';
+      const tFarm = translations[currentLang].farm;
+      const genderTag = getGenderLabel(s.gender, currentLang);
+      const personalityName = s.personality ? getPersonalityLabel(s.personality, currentLang) : '';
+      const personalityTag = personalityName ? ` · ${personalityName}` : '';
+      const qualityTag = getQualityLabel(s.quality, currentLang);
+
       const statusLabel = isSleeping
-        ? ' · Snoozing 💤'
+        ? ` · ${tFarm.status.snoozing}`
         : isGrazing
-        ? ' · Grazing 🌿'
+        ? ` · ${tFarm.status.grazing}`
         : s.socialAction === 'headbutt'
-        ? ' · Headbutt 💥'
+        ? ` · ${tFarm.status.headbutt}`
         : s.socialAction === 'hop'
-        ? ' · Play Hop ✨'
+        ? ` · ${tFarm.status.hop}`
         : s.scratchType === 'ear_flutter'
-        ? ' · Fluttering Ears 🌾'
+        ? ` · ${tFarm.status.earFlutter}`
         : s.scratchType === 'head_shake'
-        ? ' · Shaking Head 🎵'
+        ? ` · ${tFarm.status.headShake}`
         : '';
-      const personalityTag = s.personality ? ` · ${s.personality}` : '';
+
       const traitIcon = (s.hasRedBowTie || s.personality === '文静' || s.personality === '温顺' || s.personality === '善良')
-        ? ' 🎀'
+        ? ' · 🎀'
         : (s.hasHorns || s.personality === '活泼' || s.personality === '开朗' || s.personality === '暴躁')
-        ? ' 📐'
+        ? ' · 📐'
         : s.personality === '忧郁'
-        ? ' 🌙'
+        ? ' · 🌙'
         : '';
-      const label = `${s.name} (${genderTag}${personalityTag}${traitIcon} · ${s.hours}h · ${s.quality}${statusLabel})`;
+      const label = `${s.name} (${genderTag}${personalityTag}${traitIcon} · ${s.hours}h · ${qualityTag}${statusLabel})`;
       const textW = ctx.measureText(label).width;
 
       ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
@@ -1456,18 +1464,20 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
       <div className="absolute bottom-3 left-3 sm:left-4 z-10 flex flex-wrap items-center gap-2 sm:gap-3 bg-slate-950/85 backdrop-blur-md px-3.5 py-1.5 sm:py-2 rounded-xl border border-slate-800/80 text-[11px] sm:text-xs text-slate-300">
         <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          Autonomous Flock Active
+          {translations[currentLang].farm.autonomousFlock}
         </span>
         <span className="text-slate-600 hidden sm:inline">·</span>
-        <span>Click sheep: inspect diary & pet</span>
+        <span>{translations[currentLang].farm.clickHint}</span>
         <span className="text-slate-600 hidden sm:inline">·</span>
-        <span>Double-click grass: ring bell to summon flock</span>
+        <span>{translations[currentLang].farm.doubleClickHint}</span>
       </div>
 
       {/* Flock count counter in top right */}
       <div className="absolute top-3 right-3 sm:right-4 z-10 flex items-center gap-2 bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800/80 text-xs text-slate-300">
-        <span className="text-slate-400">Flock Size:</span>
-        <span className="font-mono font-semibold text-amber-300 tabular-nums">{sheep.length} sheep</span>
+        <span className="text-slate-400">{translations[currentLang].farm.flockSize}</span>
+        <span className="font-mono font-semibold text-amber-300 tabular-nums">
+          {sheep.length} {translations[currentLang].farm.sheepUnit}
+        </span>
       </div>
     </div>
   );

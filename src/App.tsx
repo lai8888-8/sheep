@@ -7,6 +7,7 @@ import { FarmCanvas } from './simulation/FarmCanvas';
 import { FloatingSleepForm } from './components/FloatingSleepForm';
 import { SheepDiaryModal } from './components/SheepDiaryModal';
 import { CompendiumModal } from './components/CompendiumModal';
+import { Language, translations } from './i18n/translations';
 
 const INITIAL_DEMO_SHEEP: Array<{
   name: string;
@@ -55,6 +56,25 @@ export default function App() {
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isCompendiumOpen, setIsCompendiumOpen] = useState(false);
   const [selectedSheep, setSelectedSheep] = useState<SheepCreature | null>(null);
+
+  // Language state: defaults to English ('en')
+  const [lang, setLang] = useState<Language>(() => {
+    try {
+      const saved = localStorage.getItem('sleep_farm_lang');
+      if (saved === 'zh' || saved === 'en') return saved;
+    } catch {
+      // Ignore
+    }
+    return 'en'; // default to English
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sleep_farm_lang', lang);
+    } catch {
+      // Ignore
+    }
+  }, [lang]);
 
   // Initialize flock with localStorage persistence
   const [sheep, setSheep] = useState<SheepCreature[]>(() => {
@@ -224,6 +244,8 @@ export default function App() {
         timeOfDay={timeOfDay}
         onChangeTimeOfDay={handleChangeTimeOfDay}
         flockCount={sheep.length}
+        currentLang={lang}
+        onToggleLang={() => setLang((prev) => (prev === 'en' ? 'zh' : 'en'))}
       />
 
       {/* Main Single-Page Stage */}
@@ -235,19 +257,21 @@ export default function App() {
             sheep={sheep}
             onSelectSheep={(s) => setSelectedSheep(s)}
             timeOfDay={timeOfDay}
+            currentLang={lang}
           />
 
-          {/* On-Canvas Floating Sleep Form (Exact p5.js UX) */}
+          {/* On-Canvas Floating Sleep Form */}
           <FloatingSleepForm
             onSubmit={handleAddSheep}
             todayCount={todayCount}
+            currentLang={lang}
           />
         </div>
       </main>
 
       {/* Footer */}
       <footer className="w-full border-t border-slate-900 py-3 px-6 text-center text-xs text-slate-500 font-mono">
-        Sleep Farm · Virtual Creature · Code as Creative Medium (Golan Levin & Tega Brain)
+        {translations[lang].footer.text}
       </footer>
 
       {/* Sheep Diary & Details Modal */}
@@ -255,6 +279,7 @@ export default function App() {
         sheep={selectedSheep}
         onClose={() => setSelectedSheep(null)}
         onPet={handlePetSheep}
+        currentLang={lang}
       />
 
       {/* Sheep Collection Compendium & Genetics Modal */}
@@ -263,6 +288,7 @@ export default function App() {
         onClose={() => setIsCompendiumOpen(false)}
         sheepList={sheep}
         onSelectSheep={(s) => setSelectedSheep(s)}
+        currentLang={lang}
       />
     </div>
   );

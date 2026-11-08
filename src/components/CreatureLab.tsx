@@ -2,9 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Sliders, Volume2, Sparkles, Activity, Eye, Zap, Info, Moon, Utensils, Heart } from 'lucide-react';
 import { DreamType, SleepQuality, PersonalityType } from '../types/sheep';
 import { soundEngine, getSheepBleatConfig } from '../audio/synth';
+import { Language, translations, getPersonalityLabel, getGenderLabel, getQualityLabel, getDreamTypeLabel } from '../i18n/translations';
 
-export const CreatureLab: React.FC = () => {
+interface CreatureLabProps {
+  currentLang?: Language;
+}
+
+export const CreatureLab: React.FC<CreatureLabProps> = ({ currentLang = 'en' }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const t = translations[currentLang].creatureLab;
+  const tPers = translations[currentLang].personality;
 
   // Lab Controls State
   const [hours, setHours] = useState(8.0);
@@ -485,37 +492,37 @@ export const CreatureLab: React.FC = () => {
         <div>
           <h2 className="text-xl font-bold text-white font-display flex items-center gap-2">
             <Sliders className="w-5 h-5 text-cyan-400" />
-            <span>Creature Genetics Lab & Parametric Inspector</span>
+            <span>{t.title}</span>
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Real-time biometric sandbox demonstrating the mathematical formulas mapping sleep to creature phenotype.
+            {t.subtitle}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           <button
             onClick={handleTestChew}
-            title="Listen to procedural grass crunch bite"
+            title={currentLang === 'zh' ? '测试咀嚼青草声' : 'Listen to procedural grass crunch bite'}
             className="px-3 py-1.5 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/60 text-xs font-semibold flex items-center gap-1.5 transition-colors"
           >
             <Utensils className="w-3.5 h-3.5" />
-            <span>Munch Grass</span>
+            <span>{t.munchGrass}</span>
           </button>
           <button
             onClick={handleTestSnore}
-            title="Listen to gentle procedural breathing snore"
+            title={currentLang === 'zh' ? '测试轻柔睡眠呼吸声' : 'Listen to gentle procedural breathing snore'}
             className="px-3 py-1.5 rounded-xl bg-indigo-950/60 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-900/60 text-xs font-semibold flex items-center gap-1.5 transition-colors"
           >
             <Moon className="w-3.5 h-3.5" />
-            <span>Gentle Snore</span>
+            <span>{t.gentleSnore}</span>
           </button>
           <button
             onClick={handleTestBleat}
-            title="Listen to parametric bleat vocalization based on current sleep data"
+            title={currentLang === 'zh' ? '根据当前睡眠参数测试发声' : 'Listen to parametric bleat vocalization based on current sleep data'}
             className="px-3.5 py-1.5 rounded-xl bg-cyan-950/60 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-900/60 text-xs font-semibold flex items-center gap-1.5 transition-colors"
           >
             <Volume2 className="w-3.5 h-3.5" />
-            <span>Vocal: {voice.label}</span>
+            <span>{t.vocal} {voice.label}</span>
           </button>
         </div>
       </div>
@@ -526,8 +533,8 @@ export const CreatureLab: React.FC = () => {
         {/* Left Stage (7 cols) */}
         <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-between min-h-[460px]">
           <div className="w-full flex items-center justify-between text-xs text-slate-400 font-mono">
-            <span>ISOLATED MORPHOLOGY STAGE</span>
-            <span className="text-cyan-400">1.5× MAGNIFICATION</span>
+            <span>{t.isolatedStage}</span>
+            <span className="text-cyan-400">{t.magnification}</span>
           </div>
 
           <div className="relative w-full flex items-center justify-center py-6">
@@ -542,26 +549,32 @@ export const CreatureLab: React.FC = () => {
           {/* Real-time Math Output Card */}
           <div className="w-full grid grid-cols-3 gap-3 text-xs bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80 font-mono">
             <div>
-              <span className="text-slate-500 block text-[11px]">Radius Formula</span>
+              <span className="text-slate-500 block text-[11px]">{t.radiusFormula}</span>
               <span className="text-emerald-400 font-semibold">{Math.round(finalSize)}px</span>
               <span className="text-slate-500 text-[10px] block">base * (0.82 + h*0.035)</span>
             </div>
             <div>
-              <span className="text-slate-500 block text-[11px]">Personality & Accent</span>
+              <span className="text-slate-500 block text-[11px]">{t.personalityAccent}</span>
               <span className="text-amber-300 font-semibold flex items-center gap-1">
-                {personality}
-                {hasRedBowTie && ' · 🎀 领结'}
-                {hasHorns && ' · 📐 锥角'}
-                {hasClosedEyes && ' · 🌙 闭眼'}
+                {getPersonalityLabel(personality, currentLang)}
+                {hasRedBowTie && (currentLang === 'zh' ? ' · 🎀 领结' : ' · 🎀 Bow Tie')}
+                {hasHorns && (currentLang === 'zh' ? ' · 📐 锥角' : ' · 📐 Horns')}
+                {hasClosedEyes && (currentLang === 'zh' ? ' · 🌙 闭眼' : ' · 🌙 Sleepy Eyes')}
               </span>
               <span className="text-slate-500 text-[10px] block">
-                {hasHorns ? '双黑色三角锥角' : hasRedBowTie ? '精致红色领结' : '沉思闭目'}
+                {hasHorns
+                  ? (currentLang === 'zh' ? '双黑色三角锥角' : 'Dual cone horns')
+                  : hasRedBowTie
+                  ? (currentLang === 'zh' ? '精致红色领结' : 'Red silk bow tie')
+                  : (currentLang === 'zh' ? '沉思闭目' : 'Closed reverie eyes')}
               </span>
             </div>
             <div>
-              <span className="text-slate-500 block text-[11px]">Gait & Pace</span>
+              <span className="text-slate-500 block text-[11px]">{t.gaitPace}</span>
               <span className="text-cyan-400 font-semibold">{maxSpeed.toFixed(2)} px/f</span>
-              <span className="text-slate-500 text-[10px] block">Kinematic trot velocity</span>
+              <span className="text-slate-500 text-[10px] block">
+                {currentLang === 'zh' ? '小跑运动学步速' : 'Kinematic trot velocity'}
+              </span>
             </div>
           </div>
         </div>
@@ -570,14 +583,16 @@ export const CreatureLab: React.FC = () => {
         <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
           <div className="flex items-center gap-2 pb-2 border-b border-slate-800 text-sm font-semibold text-white">
             <Activity className="w-4 h-4 text-cyan-400" />
-            <span>Circadian Parameter Modifiers</span>
+            <span>{t.circModifiers}</span>
           </div>
 
           {/* Slider 1: Sleep Hours */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-300 font-medium">Sleep Duration:</span>
-              <span className="font-mono text-cyan-300 font-semibold">{hours.toFixed(1)} hrs</span>
+              <span className="text-slate-300 font-medium">{t.durationLabel}</span>
+              <span className="font-mono text-cyan-300 font-semibold">
+                {hours.toFixed(1)} {currentLang === 'zh' ? '小时' : 'hrs'}
+              </span>
             </div>
             <input
               type="range"
@@ -589,13 +604,13 @@ export const CreatureLab: React.FC = () => {
               className="w-full accent-cyan-400 cursor-pointer"
             />
             <p className="text-[11px] text-slate-500">
-              Hours scale cellular wool volume and roundness across the pasture.
+              {t.durationDesc}
             </p>
           </div>
 
           {/* Radio: Sleep Quality */}
           <div className="space-y-1.5">
-            <span className="text-xs text-slate-300 font-medium block">Sleep Quality:</span>
+            <span className="text-xs text-slate-300 font-medium block">{t.qualityLabel}</span>
             <div className="grid grid-cols-3 gap-2">
               {(['Great', 'Okay', 'Poor'] as SleepQuality[]).map((q) => (
                 <button
@@ -608,18 +623,18 @@ export const CreatureLab: React.FC = () => {
                       : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  {q}
+                  {getQualityLabel(q, currentLang)}
                 </button>
               ))}
             </div>
             <p className="text-[11px] text-slate-500">
-              Alters physical vitality, eyelid alertness, and harmonic trot speed.
+              {t.qualityDesc}
             </p>
           </div>
 
           {/* Radio: Dream Type */}
           <div className="space-y-1.5">
-            <span className="text-xs text-slate-300 font-medium block">Dream Sentiment Mood:</span>
+            <span className="text-xs text-slate-300 font-medium block">{t.dreamTypeLabel}</span>
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
@@ -630,7 +645,7 @@ export const CreatureLab: React.FC = () => {
                     : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Lucid / Good
+                {t.dreamGood}
               </button>
               <button
                 type="button"
@@ -641,7 +656,7 @@ export const CreatureLab: React.FC = () => {
                     : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Peaceful
+                {t.dreamNeutral}
               </button>
               <button
                 type="button"
@@ -652,28 +667,32 @@ export const CreatureLab: React.FC = () => {
                     : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Nightmare
+                {t.dreamBad}
               </button>
             </div>
             <p className="text-[11px] text-slate-500">
-              Shifts wool pigmentation from cotton-candy pastel to storm ash.
+              {t.dreamDesc}
             </p>
           </div>
 
-          {/* Personality Clusters & Visual Accents (性格与专属外观表征) */}
+          {/* Personality Clusters & Visual Accents */}
           <div className="space-y-2.5 pt-1">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-300 font-medium">Personality & Visual Accent:</span>
+              <span className="text-slate-300 font-medium">{t.personalityTitle}</span>
               <span className="text-[11px] font-mono text-amber-300">
-                {hasRedBowTie ? '🎀 红色领结' : hasHorns ? '📐 短小双黑色锥角' : '🌙 闭目沉思'}
+                {hasRedBowTie
+                  ? (currentLang === 'zh' ? '🎀 红色领结' : '🎀 Red Bow Tie')
+                  : hasHorns
+                  ? (currentLang === 'zh' ? '📐 短小双黑色锥角' : '📐 Dual Black Cone Horns')
+                  : (currentLang === 'zh' ? '🌙 闭目沉思' : '🌙 Closed Reverie Eyes')}
               </span>
             </div>
 
-            {/* Cluster 1: 温和/善意类 */}
+            {/* Cluster 1: Gentle */}
             <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-rose-400 font-semibold">① 温和/善意类</span>
-                <span className="text-rose-300 font-mono text-[10px]">佩戴红色领结 🎀</span>
+                <span className="text-rose-400 font-semibold">{t.clusterGentle}</span>
+                <span className="text-rose-300 font-mono text-[10px]">{t.clusterGentleDesc}</span>
               </div>
               <div className="grid grid-cols-3 gap-1.5">
                 {(['文静', '温顺', '善良'] as PersonalityType[]).map((p) => (
@@ -687,17 +706,17 @@ export const CreatureLab: React.FC = () => {
                         : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    {p} {p === '文静' ? '🎀' : ''}
+                    {getPersonalityLabel(p, currentLang)} {p === '文静' ? '🎀' : ''}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Cluster 2: 活力/激越类 */}
+            {/* Cluster 2: Lively */}
             <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-amber-400 font-semibold">② 活力/激越类</span>
-                <span className="text-amber-300 font-mono text-[10px]">生双黑色三角锥角 📐</span>
+                <span className="text-amber-400 font-semibold">{t.clusterLively}</span>
+                <span className="text-amber-300 font-mono text-[10px]">{t.clusterLivelyDesc}</span>
               </div>
               <div className="grid grid-cols-3 gap-1.5">
                 {(['活泼', '开朗', '暴躁'] as PersonalityType[]).map((p) => (
@@ -711,17 +730,17 @@ export const CreatureLab: React.FC = () => {
                         : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    {p} {p === '暴躁' ? '⚡' : '📐'}
+                    {getPersonalityLabel(p, currentLang)} {p === '暴躁' ? '⚡' : '📐'}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Cluster 3: 忧郁/独处类 */}
+            {/* Cluster 3: Melancholy */}
             <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-cyan-400 font-semibold">③ 忧郁/独处类</span>
-                <span className="text-cyan-300 font-mono text-[10px]">闭目沉思 / 自由游弋 🌙</span>
+                <span className="text-cyan-400 font-semibold">{t.clusterMelancholy}</span>
+                <span className="text-cyan-300 font-mono text-[10px]">{t.clusterMelancholyDesc}</span>
               </div>
               <div className="grid grid-cols-2 gap-1.5">
                 {(['忧郁', '独立'] as PersonalityType[]).map((p) => (
@@ -735,7 +754,7 @@ export const CreatureLab: React.FC = () => {
                         : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    {p} {p === '忧郁' ? '🌙' : '🐾'}
+                    {getPersonalityLabel(p, currentLang)} {p === '忧郁' ? '🌙' : '🐾'}
                   </button>
                 ))}
               </div>
@@ -744,7 +763,7 @@ export const CreatureLab: React.FC = () => {
 
           {/* Gender Selector: Ram vs Ewe */}
           <div className="space-y-1.5">
-            <span className="text-xs text-slate-300 font-medium block">Creature Gender:</span>
+            <span className="text-xs text-slate-300 font-medium block">{t.genderLabel}</span>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -755,7 +774,7 @@ export const CreatureLab: React.FC = () => {
                     : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <span>♂ Ram (公羊)</span>
+                <span>{getGenderLabel('ram', currentLang)}</span>
               </button>
               <button
                 type="button"
@@ -766,14 +785,14 @@ export const CreatureLab: React.FC = () => {
                     : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <span>♀ Ewe (母羊)</span>
+                <span>{getGenderLabel('ewe', currentLang)}</span>
               </button>
             </div>
           </div>
 
           {/* Behavioral Gesture Testing */}
           <div className="space-y-1.5 pt-1">
-            <span className="text-xs text-slate-300 font-medium block">Simulate Interactive Behavior:</span>
+            <span className="text-xs text-slate-300 font-medium block">{t.gesturesLabel}</span>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
               <button
                 type="button"
@@ -789,7 +808,7 @@ export const CreatureLab: React.FC = () => {
                     : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:text-white'
                 }`}
               >
-                Headbutt 💥
+                {t.gestureHeadbutt}
               </button>
               <button
                 type="button"
@@ -805,7 +824,7 @@ export const CreatureLab: React.FC = () => {
                     : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:text-white'
                 }`}
               >
-                Play Hop ✨
+                {t.gestureHop}
               </button>
               <button
                 type="button"
@@ -820,7 +839,7 @@ export const CreatureLab: React.FC = () => {
                     : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:text-white'
                 }`}
               >
-                Ear Flutter 🌾
+                {t.gestureEarFlutter}
               </button>
               <button
                 type="button"
@@ -835,7 +854,7 @@ export const CreatureLab: React.FC = () => {
                     : 'bg-slate-950/80 border-slate-800 text-slate-300 hover:text-white'
                 }`}
               >
-                Head Shake 🎵
+                {t.gestureHeadShake}
               </button>
             </div>
           </div>
@@ -846,7 +865,9 @@ export const CreatureLab: React.FC = () => {
               onClick={() => setFacing((f) => (f === 1 ? -1 : 1))}
               className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white"
             >
-              Flip ({facing === 1 ? 'Right' : 'Left'})
+              {currentLang === 'zh'
+                ? `翻转 (${facing === 1 ? '右向' : '左向'})`
+                : `Flip (${facing === 1 ? 'Right' : 'Left'})`}
             </button>
             <button
               onClick={() => {
@@ -866,7 +887,9 @@ export const CreatureLab: React.FC = () => {
                   : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
               }`}
             >
-              {isGrazing ? 'Grazing 🌿' : 'Simulate Grazing'}
+              {isGrazing
+                ? (currentLang === 'zh' ? '正在吃草 🌿' : 'Grazing 🌿')
+                : (currentLang === 'zh' ? '模拟吃草' : 'Simulate Grazing')}
             </button>
             <button
               onClick={() => {
@@ -886,14 +909,16 @@ export const CreatureLab: React.FC = () => {
                   : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
               }`}
             >
-              {isSleeping ? 'Snoozing 💤' : 'Simulate Sleep'}
+              {isSleeping
+                ? (currentLang === 'zh' ? '正在打盹 💤' : 'Snoozing 💤')
+                : (currentLang === 'zh' ? '模拟入睡' : 'Simulate Sleep')}
             </button>
             {activeGesture !== 'none' && (
               <button
                 onClick={() => setActiveGesture('none')}
                 className="px-2.5 py-1.5 rounded-lg bg-rose-950/60 border border-rose-500/30 text-rose-300 hover:bg-rose-900/60 text-xs"
               >
-                Reset Idle
+                {currentLang === 'zh' ? '恢复待机' : 'Reset Idle'}
               </button>
             )}
           </div>
