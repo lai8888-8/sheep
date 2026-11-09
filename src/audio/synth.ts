@@ -4,10 +4,14 @@
  * bell chimes, and nocturnal meadow crickets with zero external audio assets.
  */
 
+// 引入时间类型，用于控制白天、黄昏、黑夜等不同环境的背景音。
+// Imports the TimeOfDay type to control different ambient soundscapes.
 import { TimeOfDay } from '../types/sheep';
 
 export type BleatVariety = 'classic' | 'baby' | 'deep' | 'double' | 'purr';
 
+// 核心音频引擎类。完全不依赖外部 MP3/WAV 文件，纯靠数学计算发声。
+// The core sound engine class. Zero external assets, purely synthesized via math.
 class SoundEngine {
   private ctx: AudioContext | null = null;
   private ambientGain: GainNode | null = null;
@@ -16,15 +20,25 @@ class SoundEngine {
   private isMuted = false;
   private timeOfDay: TimeOfDay = 'day';
 
+  // 这两个振荡器用来产生背景的“持续低音（Drone）”，模拟夜晚或白天的氛围。
+  // Dual oscillators for the background ambient drone.
+
   private droneOsc1: OscillatorNode | null = null;
   private droneOsc2: OscillatorNode | null = null;
   private droneFilter: BiquadFilterNode | null = null;
   private natureTimer: number | null = null;
   private melodyTimer: number | null = null;
 
+  //定时器，用于随机触发环境音（如鸟叫、虫鸣）和旋律拨弦。
+  // Timers for randomly triggering nature sounds and melodic plucks.
+
+  //节流控制，防止吃草声和打鼾声在一帧内疯狂触发导致爆音。
+  // Throttle timestamps to prevent audio clipping from overlapping sounds.
   private lastChewAudioTime = 0;
   private lastSnoreAudioTime = 0;
 
+  // 初始化音频上下文。现代浏览器要求用户点击页面后才能初始化 AudioContext。
+  // Initialize the AudioContext (requires user interaction in browsers).
   private initContext() {
     if (!this.ctx) {
       const AudioCtx =
@@ -33,7 +47,7 @@ class SoundEngine {
       this.ctx = new AudioCtx();
 
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.setValueAtTime(0.8, this.ctx.currentTime);
+      this.masterGain.gain.setValueAtTime(0.8, this.ctx.currentTime); // 默认主音量 0.8 / Default master volume
       this.masterGain.connect(this.ctx.destination);
     }
 
@@ -42,6 +56,7 @@ class SoundEngine {
     }
   }
 
+    // 切换静音状态 / Toggles mute state.
   public setMuted(muted: boolean) {
     this.isMuted = muted;
     if (this.masterGain && this.ctx) {
@@ -60,6 +75,8 @@ class SoundEngine {
   /**
    * Helper: Create short white/pink noise buffer for grassy crunches & breath sounds
    */
+  // 生成“粉红噪音（Pink Noise）”。这是一种比白噪音更柔和的随机声波，用来模拟风吹、吃草和呼吸声。
+  // Generates Pink Noise (softer than white noise) for wind, grass, and breathing.
   private createNoiseBuffer(duration = 0.5): AudioBuffer | null {
     if (!this.ctx) return null;
     const bufferSize = Math.floor(this.ctx.sampleRate * duration);
@@ -239,7 +256,9 @@ class SoundEngine {
       // Audio safety fallback
     }
   }
-
+  
+  // 重点讲解】这是最硬核的音频合成函数！模拟了人类/动物的声带（Formant 共振峰）。
+  // [HIGHLIGHT] This is the core synthesis function! Simulates vocal tract formants.
   /**
    * Helper: Synthesize a single vocal bleat burst with formant filters and throat tremor
    */
@@ -872,6 +891,8 @@ export interface SheepVoiceProfile {
   label: string;
 }
 
+// 【重点讲解】这是连接“睡眠数据”和“音频”的桥梁！
+// This is the bridge connecting "sleep data" and "audio"!
 /**
  * Determine acoustic vocalization profile based on biometric sleep phenotype
  */
