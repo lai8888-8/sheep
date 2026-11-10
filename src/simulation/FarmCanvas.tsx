@@ -187,7 +187,10 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
     grassBladesRef.current = grass;
   }, []);
 
-  // Main Render & Simulation Loop
+    // =====================================================================
+  // 【大段批注 1】：核心渲染循环 (The Main Render Loop)
+  // 解释：这是整个画布的心脏。每秒运行 60 次（60fps），负责调用物理引擎并画图。
+  // =====================================================================
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -237,7 +240,8 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
       ctx.save();
       ctx.scale(dpr, dpr);
 
-      // Sky
+      // 3. 开始画背景 / Draw Background
+      //drawsky
       drawSky(ctx, w, h, timeOfDay);
 
       // Stars (visible in night/twilight/dawn, hidden in daytime)
@@ -257,7 +261,11 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
         drawDreamFodder(ctx, fodder.x, fodder.y, frame);
       }
 
-      // Sheep sorted by Y for 2.5D depth
+       // =====================================================================
+      // 【大段批注 2】：2.5D 深度排序 (2.5D Depth Sorting)
+      // 解释：这是一个非常经典的游戏开发技巧。按 Y 坐标排序，Y 轴越靠下（数值越大）代表离镜头越近。
+      // 先画后面的羊，再画前面的羊，这样前面的羊就能遮住后面的羊，产生立体感。
+      // =====================================================================
       const sortedSheep = [...sheep].sort((a, b) => a.y - b.y);
       for (const s of sortedSheep) {
         // Grazing audio & grass particles
@@ -345,7 +353,11 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
             color: '#fef08a',
           });
         }
-
+        
+  // =====================================================================
+  // 【大段批注 3】：程序化绘制一只羊 (Procedural Sheep Drawing)
+  // 解释：这里完全不使用任何外部图片（PNG/JPG），所有画面都是 Canvas API 算出来的。
+  // =====================================================================
         drawSheep(ctx, s, frame, s.id === hoveredSheepId, showDebugForces);
       }
 
@@ -748,9 +760,12 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
     ctx.scale(scaleX, 1);
 
     const wool = s.woolColor;
-    const outline = shade(wool, -0.3);
+    const outline = shade(wool, -0.3); // 计算深色描边
     const OW = Math.max(1.5, sz * 0.05); // outline thickness
 
+    // 【核心技巧 A】：云朵羊毛集群绘制
+    // 解释：为了画出毛茸茸的云朵感，代码画了 11 个重叠的椭圆 (ellipse)。
+    // 且为了性能，代码先画所有椭圆的外轮廓，再画所有椭圆的填充色，避免轮廓互相遮挡。
     // Draw a group of ellipses with an outline: all outlines first, then all
     // fills, so neighbouring blobs do not draw their outline over each other.
     const woolGroup = (blobs: number[][]) => {
@@ -785,7 +800,10 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
     ctx.beginPath();
     ctx.ellipse(0, sz * 0.65 - jumpY, sz * 1.05 * shadowScale, sz * 0.24 * shadowScale, 0, 0, Math.PI * 2);
     ctx.fill();
-
+    // =====================================================================
+    // 【核心技巧 B】：四条腿的动画与状态切换
+    // 解释：如果是在睡觉，腿缩起来；如果是走路，利用 Math.sin 产生前后摆动的步态。
+    // =====================================================================
     // Legs: if sleeping, draw folded hooves tucked under the belly; otherwise standing/walking legs
     const legLength = sz * 0.52;
     const legWidth = Math.max(4, sz * 0.13);
@@ -821,7 +839,7 @@ export const FarmCanvas: React.FC<FarmCanvasProps> = ({
         ctx.stroke();
       }
     }
-
+    // 【核心技巧 C】：画羊毛身体（调用上面的 woolGroup）
     // Wool body: tail, torso and satellite puffs (with gentle rhythmic breathing swell)
     const tailWag = isSleeping ? 0 : Math.sin(frame * 0.15) * 3;
     const breathe = isSleeping ? Math.sin(frame * 0.05 + s.id) * sz * 0.035 : 0;
