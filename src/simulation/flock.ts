@@ -1,5 +1,8 @@
 import { DreamType, PersonalityCategory, PersonalityType, SheepCreature, SleepQuality } from '../types/sheep';
-
+// 核心函数 1 —— 性格与特征生成器
+// Core Function 1: Personality & Trait Generator
+// 根据“梦境类型”，按概率随机分配羊的性格，并决定它是否长角、戴领结等。
+// Randomly assigns personality based on "dream type" probabilities, determining horns, bow ties, etc.
 export function determinePersonalityAndTraits(
   dreamType: DreamType,
   quality: SleepQuality,
@@ -15,7 +18,10 @@ export function determinePersonalityAndTraits(
   const rand = Math.random();
   let personality: PersonalityType;
   let personalityCategory: PersonalityCategory;
-
+  
+  // 美梦 (Good dream) 的权重：大概率温和文静，小概率活泼，极小概率独立。
+  // Probabilities for Good dream: High chance of gentle, low chance of lively, rare independent.
+  
   if (dreamType === 'good') {
     // Good dreams: predominantly gentle & serene (55%), or lively & cheerful (35%), rare independent (10%)
     if (rand < 0.22) {
@@ -37,6 +43,8 @@ export function determinePersonalityAndTraits(
       personality = '独立';
       personalityCategory = 'melancholy';
     }
+  //  噩梦 (Bad dream) 的权重：大概率忧郁/暴躁，小概率文静。
+  // Probabilities for Bad dream: High chance of melancholic/feisty, low chance of quiet.
   } else if (dreamType === 'bad') {
     // Bad dreams: high chance of melancholic / solitary (50%) and grumpy/feisty (35%), small quiet (15%)
     if (rand < 0.35) {
@@ -53,7 +61,8 @@ export function determinePersonalityAndTraits(
       personalityCategory = 'gentle';
     }
   } else {
-    // Neutral dreams: balanced distribution
+      //平静梦 (Neutral) 的权重：分布非常均匀。
+  // Probabilities for Neutral dream: Balanced distribution.
     if (rand < 0.18) {
       personality = '温顺';
       personalityCategory = 'gentle';
@@ -104,7 +113,12 @@ export function determinePersonalityAndTraits(
     hasClosedEyes,
   };
 }
-
+// =====================================================================
+// 核心函数 2 —— 睡眠数据到生物形态的映射器
+// Core Function 2: Sleep Data to Creature Morphology Mapper
+// 这是把冷冰冰的输入（时长、质量、梦境）变成一只具象化的小羊的“造物主”函数。
+// This is the "Creator" function that turns cold input into a tangible sheep.
+// =====================================================================
 export function generateCreatureAttributes(
   name: string,
   date: string,
@@ -192,7 +206,8 @@ export function generateCreatureAttributes(
 
   // Gender: Ram (公羊) or Ewe (母羊)
   const gender: 'ram' | 'ewe' = Math.random() > 0.5 ? 'ram' : 'ewe';
-
+  
+  // 调用上面的函数，获取性格和外观特征 / Call the function above to get personality and visual traits
   // Determine personality & visual distinctions according to dream quality
   const {
     personality,
@@ -277,6 +292,12 @@ export function generateCreatureAttributes(
 /**
  * Craig Reynolds Steering Behaviors update for flock of sheep
  */
+// =====================================================================
+// 核心函数 3 —— 羊群物理与行为更新引擎
+// Core Function 3: Flock Physics & Behavior Update Engine
+// 这个函数每一帧都会被调用，负责计算所有羊的位置、状态和交互。
+// This function is called every frame, calculating all sheep's positions, states, and interactions.
+// =====================================================================
 export function updateFlock(
   sheep: SheepCreature[],
   width: number,
@@ -285,7 +306,8 @@ export function updateFlock(
 ) {
   const groundTop = height * 0.62;
   const groundBottom = height - 50;
-
+  
+ // 遍历每一只羊 / Loop through every sheep
   for (let i = 0; i < sheep.length; i++) {
     const s = sheep[i];
 
@@ -294,21 +316,24 @@ export function updateFlock(
       s.isSleeping = false;
       s.sleepTimer = 0;
     }
-
+    
+// 【状态机 1：睡眠状态】 / [State Machine 1: Sleeping State]
+    
     // 1. Sleeping / Snoozing state
     if (s.sleepTimer > 0) {
       s.sleepTimer--;
       s.isSleeping = true;
       s.isGrazing = false;
-      s.vx *= 0.75;
+      s.vx *= 0.75; // 逐渐减速停下 / Decelerate to a stop
       s.vy *= 0.75;
       s.x += s.vx;
       s.y += s.vy;
-      continue;
+      continue;// 跳过后续的移动逻辑 / Skip subsequent movement logic
     } else {
       s.isSleeping = false;
     }
-
+    
+    // 【状态机 2：吃草状态】 / [State Machine 2: Grazing State]
     // 2. Grazing logic: sheep stops to munch on grass
     if (s.grazingTimer > 0) {
       s.grazingTimer--;
@@ -321,7 +346,8 @@ export function updateFlock(
     } else {
       s.isGrazing = false;
     }
-
+    
+    // 【状态机 3：社交互动状态（顶角或跳跃）】 / [State Machine 3: Social Interaction (Headbutt or Hop)]
     // 3. Social Interaction state (Headbutting or Play Hop)
     if (s.socialTimer && s.socialTimer > 0) {
       s.socialTimer--;
@@ -329,18 +355,21 @@ export function updateFlock(
       const progress = 1 - s.socialTimer / duration;
 
       if (s.socialAction === 'headbutt') {
-        // Windup (pull back) -> charge forward -> bonk -> recoil
+         // 【批注 / Annotation】: 顶角动画分为四个阶段：蓄力后拉 -> 猛冲 -> 撞击 -> 反弹。
+        // Headbutt animation has 4 phases: windup -> charge -> bonk -> recoil.
         if (progress < 0.32) {
           const t = progress / 0.32;
-          s.headbuttOffset = -t * 6;
+          s.headbuttOffset = -t * 6; // 后拉 / Windup
         } else if (progress < 0.52) {
           const t = (progress - 0.32) / 0.2;
-          s.headbuttOffset = -6 + t * 16;
+          s.headbuttOffset = -6 + t * 16;// 猛冲 / Charge
         } else {
           const t = (progress - 0.52) / 0.48;
-          s.headbuttOffset = 10 * (1 - t * 0.85);
+          s.headbuttOffset = 10 * (1 - t * 0.85);// 反弹 / Recoil
         }
       } else if (s.socialAction === 'hop') {
+         // 【批注 / Annotation】: 跳跃动画使用正弦波实现平滑的抛物线。
+        // Hop animation uses a sine wave for a smooth parabolic arc.
         // Joyful play bounce arc
         s.jumpY = -Math.sin(progress * Math.PI) * 16;
       }
@@ -360,7 +389,7 @@ export function updateFlock(
       continue;
     }
 
-    // 4. Idle Scratch / Ear Flutter / Head Shake state
+    // 【状态机 4：日常小动作（扑耳、晃头）】 / [State Machine 4: Idle Scratch / Ear Flutter / Head Shake]
     if (s.scratchTimer && s.scratchTimer > 0) {
       s.scratchTimer--;
       s.vx *= 0.75;
@@ -376,7 +405,8 @@ export function updateFlock(
 
     const now = Date.now();
 
-    // Spontaneous natural idle & social behaviors (only when not running towards clover)
+    // 【批注 / Annotation】: 随机触发机制。如果当前没有在向目标移动，羊会随机做小动作。
+    // Random triggering mechanism. If not moving to a target, sheep will randomly perform actions.
     if (!targetPoint) {
       // Chance to start grazing on the sweet grass
       if (Math.random() < 0.0028) {
@@ -385,7 +415,8 @@ export function updateFlock(
         continue;
       }
 
-      // Chance to lie down and take a nap
+      // 【批注 / Annotation】: 睡眠质量越差（Poor）的羊，随机打盹的概率越高。
+      // Sheep with Poor sleep quality have a higher chance of randomly napping.
       const napChance = s.quality === 'Poor' ? 0.0032 : s.quality === 'Okay' ? 0.0018 : 0.001;
       if (Math.random() < napChance) {
         s.sleepTimer = 200 + Math.floor(Math.random() * 220);
@@ -393,7 +424,7 @@ export function updateFlock(
         continue;
       }
 
-      // Chance for idle scratch / head shake / ear flutter
+       // 随机扑耳/晃头 / Random ear flutter or head shake
       if (now - (s.lastScratchTime || 0) > 6500 && Math.random() < 0.006) {
         s.scratchType = Math.random() > 0.4 ? 'ear_flutter' : 'head_shake';
         s.scratchTimer = 35 + Math.floor(Math.random() * 25);
@@ -401,7 +432,8 @@ export function updateFlock(
         continue;
       }
 
-      // Social proximity encounter (Headbutting or Play Hop)
+      // 【批注 / Annotation】: 社交检测。当两只羊距离在 36 到 72 像素之间，有概率触发互动。
+      // Social encounter check. If two sheep are between 36 and 72 pixels apart, they might interact.
       if (now - (s.lastSocialTime || 0) > 9000) {
         for (let j = 0; j < sheep.length; j++) {
           if (i === j) continue;
@@ -421,18 +453,21 @@ export function updateFlock(
             if (dist > 36 && dist < 72 && Math.random() < 0.045) {
               s.facing = s.x <= other.x ? 1 : -1;
               other.facing = (s.facing === 1 ? -1 : 1);
-
+              
+ // 性格决定互动方式。暴躁的羊大概率顶角，活泼的羊大概率跳跃。
+ // Personality dictates interaction. Feisty sheep likely headbutt, playful sheep likely hop.
               let action: 'headbutt' | 'hop';
               if (s.personality === '暴躁' || other.personality === '暴躁') {
                 action = Math.random() > 0.2 ? 'headbutt' : 'hop';
               } else if (s.personality === '活泼' || other.personality === '活泼' || s.personality === '开朗') {
                 action = Math.random() > 0.25 ? 'hop' : 'headbutt';
-              } else if (s.gender === 'ram' && other.gender === 'ram') {
+              } else if (s.gender === 'ram' && other.gender === 'ram') { // 两只公羊大概率顶角 / Two rams likely headbutt
                 action = Math.random() > 0.25 ? 'headbutt' : 'hop';
               } else {
                 action = Math.random() > 0.35 ? 'hop' : 'headbutt';
               }
-
+              
+// 同步两只羊的动画状态 / Sync animation states for both sheep
               const dur = action === 'headbutt' ? 52 : 44;
               s.socialAction = action;
               s.socialTimer = dur;
@@ -449,17 +484,23 @@ export function updateFlock(
         }
       }
     }
-
+    
+    // =================================================================
+    // 物理引擎开始。累加所有受力（加速度）。
+    // Physics Engine starts. Accumulate all forces (accelerations).
+    // =================================================================
     let ax = 0;
     let ay = 0;
-
-    // 1. Wander behavior (smooth angular Brownian drift)
+    // 1. 游走力（Wander） / Wander Force
+    // 布朗运动。让羊在没有目标时，看起来像是在漫无目的地闲逛。
+    // Brownian drift. Makes sheep look like they are wandering aimlessly when no target.
     s.wanderAngle += (Math.random() - 0.5) * 0.25;
     const wanderForce = 0.07 * s.energy;
     ax += Math.cos(s.wanderAngle) * wanderForce;
     ay += Math.sin(s.wanderAngle) * (wanderForce * 0.6); // Less vertical drift
 
-    // 2. Craig Reynolds Separation & Cohesion
+    // 2. Craig Reynolds 的分离 (Separation) 与 聚集 (Cohesion)。
+    //Craig Reynolds' Separation & Cohesion.
     let sepX = 0;
     let sepY = 0;
     let cohX = 0;
@@ -472,15 +513,17 @@ export function updateFlock(
       const dx = s.x - other.x;
       const dy = s.y - other.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const desiredSeparation = s.size + other.size + 14;
+      const desiredSeparation = s.size + other.size + 14; // 安全距离 / Safe distance
 
+      // 分离力（防重叠） / Separation force (anti-overlap)
       if (dist > 0 && dist < desiredSeparation) {
         // Strong separation repulsion
         const force = (desiredSeparation - dist) / desiredSeparation;
         sepX += (dx / dist) * force * 0.25;
         sepY += (dy / dist) * force * 0.25;
       }
-
+      
+// 寻找邻居（用于聚集） / Find neighbors (for cohesion)
       if (dist > 0 && dist < 220) {
         cohX += other.x;
         cohY += other.y;
@@ -504,7 +547,7 @@ export function updateFlock(
       }
     }
 
-    // 3. Target seeking (Dream clover / Bell summon)
+    // 3. 目标吸引（双击草地后的草料） / Target seeking (clover after double-click)
     if (targetPoint) {
       const tx = targetPoint.x - s.x;
       const ty = targetPoint.y - s.y;
@@ -521,7 +564,7 @@ export function updateFlock(
       }
     }
 
-    // 4. Boundary avoidance and hard clamping
+    // 4. 边界避让（羊不能走到天上去） / Boundary avoidance (sheep cannot walk into the sky)
     const margin = 40;
     if (s.x < margin) ax += 0.35;
     if (s.x > width - margin) ax -= 0.35;
